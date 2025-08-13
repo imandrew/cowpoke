@@ -53,7 +53,6 @@ func TestNewClient(t *testing.T) {
 	}
 }
 
-
 // Authentication Tests
 
 func TestClient_Authenticate_Success(t *testing.T) {
@@ -430,7 +429,7 @@ users:
 		if r.URL.Path != "/v3/clusters/c-test" {
 			t.Errorf("Expected path /v3/clusters/c-test, got %s", r.URL.Path)
 		}
-		
+
 		if r.URL.Query().Get("action") != "generateKubeconfig" {
 			t.Errorf("Expected action=generateKubeconfig query parameter, got %s", r.URL.Query().Get("action"))
 		}
@@ -449,7 +448,7 @@ users:
 		}{
 			Config: mockKubeconfig,
 		}
-		
+
 		jsonResp, _ := json.Marshal(response)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -583,7 +582,7 @@ func TestClient_makeJSONRequest_GET(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(config.RancherServer{URL: server.URL})
-	
+
 	body, err := client.makeJSONRequest(context.Background(), "GET", server.URL+"/test", nil)
 
 	if err != nil {
@@ -621,7 +620,7 @@ func TestClient_makeJSONRequest_POST_WithPayload(t *testing.T) {
 
 	client := NewClient(config.RancherServer{URL: server.URL})
 	payload := map[string]string{"test": "value"}
-	
+
 	body, err := client.makeJSONRequest(context.Background(), "POST", server.URL+"/test", payload)
 
 	if err != nil {
@@ -648,7 +647,7 @@ func TestClient_makeJSONRequest_WithAuthToken(t *testing.T) {
 
 	client := NewClient(config.RancherServer{URL: server.URL})
 	client.token = "test-token"
-	
+
 	_, err := client.makeJSONRequest(context.Background(), "GET", server.URL+"/test", nil)
 
 	if err != nil {
@@ -664,7 +663,7 @@ func TestClient_makeJSONRequest_HTTPError(t *testing.T) {
 	defer server.Close()
 
 	client := NewClient(config.RancherServer{URL: server.URL})
-	
+
 	_, err := client.makeJSONRequest(context.Background(), "GET", server.URL+"/test", nil)
 
 	if err == nil {
@@ -679,7 +678,7 @@ func TestClient_makeJSONRequest_HTTPError(t *testing.T) {
 
 func TestClient_makeJSONRequest_InvalidURL(t *testing.T) {
 	client := NewClient(config.RancherServer{})
-	
+
 	_, err := client.makeJSONRequest(context.Background(), "GET", "://invalid-url", nil)
 
 	if err == nil {
@@ -693,10 +692,10 @@ func TestClient_makeJSONRequest_InvalidURL(t *testing.T) {
 
 func TestClient_makeJSONRequest_InvalidPayload(t *testing.T) {
 	client := NewClient(config.RancherServer{})
-	
+
 	// Use a channel as payload (not JSON serializable)
 	invalidPayload := make(chan int)
-	
+
 	_, err := client.makeJSONRequest(context.Background(), "POST", "http://example.com", invalidPayload)
 
 	if err == nil {

@@ -62,7 +62,7 @@ type kubeconfigResponse struct {
 
 // Authenticate authenticates the client with Rancher
 func (c *Client) Authenticate(ctx context.Context, password string) (string, error) {
-	authURL := fmt.Sprintf("%s/v3-public/%sProviders/%s?action=login", 
+	authURL := fmt.Sprintf("%s/v3-public/%sProviders/%s?action=login",
 		c.server.URL, c.server.AuthType, c.server.AuthType)
 
 	payload := map[string]string{
@@ -233,7 +233,7 @@ func isRetryable(err error) bool {
 	if errors.IsHTTPStatus(err, 429) || // Too Many Requests
 		errors.IsHTTPStatus(err, 502) || // Bad Gateway
 		errors.IsHTTPStatus(err, 503) || // Service Unavailable
-		errors.IsHTTPStatus(err, 504) {  // Gateway Timeout
+		errors.IsHTTPStatus(err, 504) { // Gateway Timeout
 		return true
 	}
 
@@ -252,7 +252,7 @@ func (s Strategy) calculateDelay(attempt int) time.Duration {
 	}
 
 	delay := float64(s.BaseDelay) * math.Pow(s.Multiplier, float64(attempt-1))
-	
+
 	if delay > float64(s.MaxDelay) {
 		delay = float64(s.MaxDelay)
 	}
@@ -269,7 +269,7 @@ func (s Strategy) calculateDelay(attempt int) time.Duration {
 // doWithRetry executes the given function with retries according to the strategy
 func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFunc) error {
 	logger := logging.Default().WithOperation("retry")
-	
+
 	var lastErr error
 	var allErrors []error
 
@@ -278,8 +278,8 @@ func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFun
 		err := fn()
 		if err == nil {
 			if attempt > 1 {
-				logger.InfoContext(ctx, "Operation succeeded after retry", 
-					"attempt", attempt, 
+				logger.InfoContext(ctx, "Operation succeeded after retry",
+					"attempt", attempt,
 					"total_attempts", strategy.MaxAttempts)
 			}
 			return nil
@@ -287,10 +287,10 @@ func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFun
 
 		lastErr = err
 		allErrors = append(allErrors, err)
-		
-		logger.WarnContext(ctx, "Operation failed", 
-			"error", err, 
-			"attempt", attempt, 
+
+		logger.WarnContext(ctx, "Operation failed",
+			"error", err,
+			"attempt", attempt,
 			"max_attempts", strategy.MaxAttempts)
 
 		// Check if this error is retryable
@@ -306,8 +306,8 @@ func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFun
 
 		// Calculate delay and wait
 		delay := strategy.calculateDelay(attempt)
-		logger.DebugContext(ctx, "Waiting before retry", 
-			"delay", delay, 
+		logger.DebugContext(ctx, "Waiting before retry",
+			"delay", delay,
 			"next_attempt", attempt+1)
 
 		select {
@@ -321,8 +321,8 @@ func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFun
 
 	// All attempts failed, return appropriate error
 	if len(allErrors) > 1 {
-		logger.ErrorContext(ctx, "All retry attempts failed", 
-			"attempts", len(allErrors), 
+		logger.ErrorContext(ctx, "All retry attempts failed",
+			"attempts", len(allErrors),
 			"last_error", lastErr)
 		return errors.NewMultiError(allErrors)
 	}

@@ -30,13 +30,13 @@ func (m *Manager) SaveKubeconfig(cluster config.Cluster, kubeconfigContent []byt
 
 	var filename string
 	var processedContent []byte
-	
+
 	if cluster.ID == "local" || cluster.Name == "local" {
 		// Special handling for Rancher local clusters (ID and Name are both "local")
 		sanitizedURL := utils.SanitizeURL(cluster.ServerURL)
 		uniqueName := fmt.Sprintf("local-%s", sanitizedURL)
 		filename = fmt.Sprintf("%s.yaml", uniqueName)
-		
+
 		// Rewrite kubeconfig content to use unique names while preserving server URLs
 		var err error
 		processedContent, err = m.rewriteLocalClusterNames(kubeconfigContent, uniqueName)
@@ -47,7 +47,7 @@ func (m *Manager) SaveKubeconfig(cluster config.Cluster, kubeconfigContent []byt
 		filename = fmt.Sprintf("%s.yaml", utils.SanitizeFilename(cluster.Name))
 		processedContent = kubeconfigContent
 	}
-	
+
 	filePath := filepath.Join(m.baseDir, filename)
 
 	err := os.WriteFile(filePath, processedContent, 0644)
@@ -62,15 +62,15 @@ func (m *Manager) SaveKubeconfig(cluster config.Cluster, kubeconfigContent []byt
 // to use unique names while preserving server URLs and credentials
 func (m *Manager) rewriteLocalClusterNames(kubeconfigContent []byte, uniqueName string) ([]byte, error) {
 	// Parse the kubeconfig
-	var kubeconfigData map[string]interface{}
+	var kubeconfigData map[string]any
 	if err := yaml.Unmarshal(kubeconfigContent, &kubeconfigData); err != nil {
 		return nil, fmt.Errorf("failed to parse kubeconfig: %w", err)
 	}
 
 	// Update clusters section: clusters[].name (preserve server URLs)
-	if clusters, ok := kubeconfigData["clusters"].([]interface{}); ok {
+	if clusters, ok := kubeconfigData["clusters"].([]any); ok {
 		for _, clusterInterface := range clusters {
-			if cluster, ok := clusterInterface.(map[string]interface{}); ok {
+			if cluster, ok := clusterInterface.(map[string]any); ok {
 				if name, exists := cluster["name"]; exists && name == "local" {
 					cluster["name"] = uniqueName
 				}
@@ -79,9 +79,9 @@ func (m *Manager) rewriteLocalClusterNames(kubeconfigContent []byte, uniqueName 
 	}
 
 	// Update users section: users[].name (preserve credentials)
-	if users, ok := kubeconfigData["users"].([]interface{}); ok {
+	if users, ok := kubeconfigData["users"].([]any); ok {
 		for _, userInterface := range users {
-			if user, ok := userInterface.(map[string]interface{}); ok {
+			if user, ok := userInterface.(map[string]any); ok {
 				if name, exists := user["name"]; exists && name == "local" {
 					user["name"] = uniqueName
 				}
@@ -90,15 +90,15 @@ func (m *Manager) rewriteLocalClusterNames(kubeconfigContent []byte, uniqueName 
 	}
 
 	// Update contexts section: contexts[].name and nested references
-	if contexts, ok := kubeconfigData["contexts"].([]interface{}); ok {
+	if contexts, ok := kubeconfigData["contexts"].([]any); ok {
 		for _, contextInterface := range contexts {
-			if context, ok := contextInterface.(map[string]interface{}); ok {
+			if context, ok := contextInterface.(map[string]any); ok {
 				// Update context name: contexts[].name
 				if name, exists := context["name"]; exists && name == "local" {
 					context["name"] = uniqueName
 				}
 				// Update nested context references: contexts[].context.{cluster,user}
-				if contextData, ok := context["context"].(map[string]interface{}); ok {
+				if contextData, ok := context["context"].(map[string]any); ok {
 					if cluster, exists := contextData["cluster"]; exists && cluster == "local" {
 						contextData["cluster"] = uniqueName
 					}

@@ -37,7 +37,7 @@ func TestNewLogger(t *testing.T) {
 
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
-	
+
 	if config.Level != LevelInfo {
 		t.Errorf("Expected default level to be %s, got: %s", LevelInfo, config.Level)
 	}
@@ -58,15 +58,15 @@ func TestLoggerWithFields(t *testing.T) {
 	}
 
 	logger := NewLogger(config)
-	
+
 	fields := map[string]any{
 		"server_url": "https://rancher.example.com",
 		"auth_type":  "local",
 	}
-	
+
 	loggerWithFields := logger.WithFields(fields)
 	loggerWithFields.Info("test message")
-	
+
 	output := buf.String()
 	if !strings.Contains(output, "test message") {
 		t.Errorf("Expected output to contain 'test message', got: %s", output)
@@ -90,7 +90,7 @@ func TestLoggerWithServer(t *testing.T) {
 	logger := NewLogger(config)
 	serverLogger := logger.WithServer("https://rancher.example.com", "github")
 	serverLogger.Info("connecting to server")
-	
+
 	output := buf.String()
 	if !strings.Contains(output, "connecting to server") {
 		t.Errorf("Expected output to contain message, got: %s", output)
@@ -114,7 +114,7 @@ func TestLoggerWithCluster(t *testing.T) {
 	logger := NewLogger(config)
 	clusterLogger := logger.WithCluster("c-cluster-123", "test-cluster")
 	clusterLogger.Info("processing cluster")
-	
+
 	output := buf.String()
 	if !strings.Contains(output, "processing cluster") {
 		t.Errorf("Expected output to contain message, got: %s", output)
@@ -138,7 +138,7 @@ func TestLoggerWithOperation(t *testing.T) {
 	logger := NewLogger(config)
 	opLogger := logger.WithOperation("sync")
 	opLogger.Info("starting operation")
-	
+
 	output := buf.String()
 	if !strings.Contains(output, "starting operation") {
 		t.Errorf("Expected output to contain message, got: %s", output)
@@ -173,12 +173,12 @@ func TestLogLevels(t *testing.T) {
 
 		logger := NewLogger(config)
 		test.logFunc(logger, "test message")
-		
+
 		output := buf.String()
 		containsMessage := strings.Contains(output, "test message")
-		
+
 		if containsMessage != test.expected {
-			t.Errorf("Level %s: expected message present = %v, got = %v, output: %s", 
+			t.Errorf("Level %s: expected message present = %v, got = %v, output: %s",
 				test.level, test.expected, containsMessage, output)
 		}
 	}
@@ -194,10 +194,10 @@ func TestGlobalLogger(t *testing.T) {
 
 	// Set a custom default logger
 	SetDefault(NewLogger(config))
-	
+
 	Info("global info message")
 	output := buf.String()
-	
+
 	if !strings.Contains(output, "global info message") {
 		t.Errorf("Expected output to contain message, got: %s", output)
 	}
@@ -213,10 +213,10 @@ func TestContextLogging(t *testing.T) {
 
 	logger := NewLogger(config)
 	ctx := context.Background()
-	
+
 	logger.InfoContext(ctx, "context message", "key", "value")
 	output := buf.String()
-	
+
 	if !strings.Contains(output, "context message") {
 		t.Errorf("Expected output to contain message, got: %s", output)
 	}
@@ -235,7 +235,7 @@ func TestJSONFormat(t *testing.T) {
 
 	logger := NewLogger(config)
 	logger.Info("json message", "key", "value")
-	
+
 	output := buf.String()
 	if !strings.Contains(output, `"msg":"json message"`) {
 		t.Errorf("Expected JSON format output, got: %s", output)
@@ -257,13 +257,13 @@ func TestWithContext(t *testing.T) {
 
 	logger := NewLogger(config)
 	ctx := context.Background()
-	
+
 	contextLogger := logger.WithContext(ctx)
 	if contextLogger == nil {
 		t.Error("Expected WithContext to return a logger")
 		return
 	}
-	
+
 	// Test that the returned logger works
 	contextLogger.Info("context test message")
 	output := buf.String()
@@ -282,14 +282,14 @@ func TestDefault(t *testing.T) {
 	}
 	customLogger := NewLogger(config)
 	SetDefault(customLogger)
-	
+
 	// Test Default() function
 	defaultLogger := Default()
 	if defaultLogger == nil {
 		t.Error("Expected Default() to return a logger")
 		return
 	}
-	
+
 	// Test that it's the same logger we set
 	defaultLogger.Info("default test message")
 	output := buf.String()
@@ -305,13 +305,13 @@ func TestDebugFunction(t *testing.T) {
 		Format: "text",
 		Output: &buf,
 	}
-	
+
 	logger := NewLogger(config)
 	SetDefault(logger)
-	
+
 	Debug("debug message", "key", "value")
 	output := buf.String()
-	
+
 	if !strings.Contains(output, "debug message") {
 		t.Errorf("Expected debug message in output, got: %s", output)
 	}
@@ -327,13 +327,13 @@ func TestWarnFunction(t *testing.T) {
 		Format: "text",
 		Output: &buf,
 	}
-	
+
 	logger := NewLogger(config)
 	SetDefault(logger)
-	
+
 	Warn("warn message", "key", "value")
 	output := buf.String()
-	
+
 	if !strings.Contains(output, "warn message") {
 		t.Errorf("Expected warn message in output, got: %s", output)
 	}
@@ -349,13 +349,13 @@ func TestErrorFunction(t *testing.T) {
 		Format: "text",
 		Output: &buf,
 	}
-	
+
 	logger := NewLogger(config)
 	SetDefault(logger)
-	
+
 	Error("error message", "key", "value")
 	output := buf.String()
-	
+
 	if !strings.Contains(output, "error message") {
 		t.Errorf("Expected error message in output, got: %s", output)
 	}
@@ -371,14 +371,14 @@ func TestDebugContextFunction(t *testing.T) {
 		Format: "text",
 		Output: &buf,
 	}
-	
+
 	logger := NewLogger(config)
 	SetDefault(logger)
-	
+
 	ctx := context.Background()
 	DebugContext(ctx, "debug context message", "key", "value")
 	output := buf.String()
-	
+
 	if !strings.Contains(output, "debug context message") {
 		t.Errorf("Expected debug context message in output, got: %s", output)
 	}
@@ -394,14 +394,14 @@ func TestInfoContextFunction(t *testing.T) {
 		Format: "text",
 		Output: &buf,
 	}
-	
+
 	logger := NewLogger(config)
 	SetDefault(logger)
-	
+
 	ctx := context.Background()
 	InfoContext(ctx, "info context message", "key", "value")
 	output := buf.String()
-	
+
 	if !strings.Contains(output, "info context message") {
 		t.Errorf("Expected info context message in output, got: %s", output)
 	}
@@ -417,14 +417,14 @@ func TestWarnContextFunction(t *testing.T) {
 		Format: "text",
 		Output: &buf,
 	}
-	
+
 	logger := NewLogger(config)
 	SetDefault(logger)
-	
+
 	ctx := context.Background()
 	WarnContext(ctx, "warn context message", "key", "value")
 	output := buf.String()
-	
+
 	if !strings.Contains(output, "warn context message") {
 		t.Errorf("Expected warn context message in output, got: %s", output)
 	}
@@ -440,14 +440,14 @@ func TestErrorContextFunction(t *testing.T) {
 		Format: "text",
 		Output: &buf,
 	}
-	
+
 	logger := NewLogger(config)
 	SetDefault(logger)
-	
+
 	ctx := context.Background()
 	ErrorContext(ctx, "error context message", "key", "value")
 	output := buf.String()
-	
+
 	if !strings.Contains(output, "error context message") {
 		t.Errorf("Expected error context message in output, got: %s", output)
 	}
@@ -490,17 +490,17 @@ func TestAllLogLevels(t *testing.T) {
 		{"Info at Debug level", LevelDebug, func(msg string, args ...any) { Info(msg, args...) }, true},
 		{"Warn at Debug level", LevelDebug, func(msg string, args ...any) { Warn(msg, args...) }, true},
 		{"Error at Debug level", LevelDebug, func(msg string, args ...any) { Error(msg, args...) }, true},
-		
+
 		{"Debug at Info level", LevelInfo, Debug, false},
 		{"Info at Info level", LevelInfo, func(msg string, args ...any) { Info(msg, args...) }, true},
 		{"Warn at Info level", LevelInfo, func(msg string, args ...any) { Warn(msg, args...) }, true},
 		{"Error at Info level", LevelInfo, func(msg string, args ...any) { Error(msg, args...) }, true},
-		
+
 		{"Debug at Warn level", LevelWarn, Debug, false},
 		{"Info at Warn level", LevelWarn, func(msg string, args ...any) { Info(msg, args...) }, false},
 		{"Warn at Warn level", LevelWarn, func(msg string, args ...any) { Warn(msg, args...) }, true},
 		{"Error at Warn level", LevelWarn, func(msg string, args ...any) { Error(msg, args...) }, true},
-		
+
 		{"Debug at Error level", LevelError, Debug, false},
 		{"Info at Error level", LevelError, func(msg string, args ...any) { Info(msg, args...) }, false},
 		{"Warn at Error level", LevelError, func(msg string, args ...any) { Warn(msg, args...) }, false},
@@ -524,7 +524,7 @@ func TestAllLogLevels(t *testing.T) {
 			hasMessage := strings.Contains(output, "test message")
 
 			if hasMessage != tt.expected {
-				t.Errorf("Expected message present = %v, got = %v, output: %s", 
+				t.Errorf("Expected message present = %v, got = %v, output: %s",
 					tt.expected, hasMessage, output)
 			}
 		})
@@ -534,7 +534,7 @@ func TestAllLogLevels(t *testing.T) {
 // Test context logging methods
 func TestAllContextLogLevels(t *testing.T) {
 	ctx := context.Background()
-	
+
 	tests := []struct {
 		name     string
 		level    LogLevel
@@ -545,17 +545,17 @@ func TestAllContextLogLevels(t *testing.T) {
 		{"InfoContext at Debug level", LevelDebug, InfoContext, true},
 		{"WarnContext at Debug level", LevelDebug, WarnContext, true},
 		{"ErrorContext at Debug level", LevelDebug, ErrorContext, true},
-		
+
 		{"DebugContext at Info level", LevelInfo, DebugContext, false},
 		{"InfoContext at Info level", LevelInfo, InfoContext, true},
 		{"WarnContext at Info level", LevelInfo, WarnContext, true},
 		{"ErrorContext at Info level", LevelInfo, ErrorContext, true},
-		
+
 		{"DebugContext at Warn level", LevelWarn, DebugContext, false},
 		{"InfoContext at Warn level", LevelWarn, InfoContext, false},
 		{"WarnContext at Warn level", LevelWarn, WarnContext, true},
 		{"ErrorContext at Warn level", LevelWarn, ErrorContext, true},
-		
+
 		{"DebugContext at Error level", LevelError, DebugContext, false},
 		{"InfoContext at Error level", LevelError, InfoContext, false},
 		{"WarnContext at Error level", LevelError, WarnContext, false},
@@ -579,7 +579,7 @@ func TestAllContextLogLevels(t *testing.T) {
 			hasMessage := strings.Contains(output, "test context message")
 
 			if hasMessage != tt.expected {
-				t.Errorf("Expected message present = %v, got = %v, output: %s", 
+				t.Errorf("Expected message present = %v, got = %v, output: %s",
 					tt.expected, hasMessage, output)
 			}
 		})

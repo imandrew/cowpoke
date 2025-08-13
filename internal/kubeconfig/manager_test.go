@@ -356,23 +356,23 @@ func TestKubeconfigManager_MergeKubeconfigs_InvalidYAML(t *testing.T) {
 func TestKubeconfigManager_SaveKubeconfig_DirectoryCreateError(t *testing.T) {
 	// Test error path when directory cannot be created
 	invalidPath := "/root/cannot_create_directory"
-	
+
 	cluster := config.Cluster{
 		ID:         "c-cluster1",
 		Name:       "test-cluster",
 		ServerID:   "server-1",
 		ServerName: "Test Server",
 	}
-	
+
 	kubeconfigContent := []byte("test content")
-	
+
 	manager := NewManager(invalidPath)
-	
+
 	_, err := manager.SaveKubeconfig(cluster, kubeconfigContent)
 	if err == nil {
 		t.Skip("Expected error creating directory, but operation succeeded")
 	}
-	
+
 	if !strings.Contains(err.Error(), "failed to create kubeconfig directory") {
 		t.Errorf("Expected directory creation error, got: %v", err)
 	}
@@ -381,30 +381,30 @@ func TestKubeconfigManager_SaveKubeconfig_DirectoryCreateError(t *testing.T) {
 func TestKubeconfigManager_SaveKubeconfig_WriteFileError(t *testing.T) {
 	// Test error path when file write fails (directory is readonly)
 	tempDir := t.TempDir()
-	
+
 	// Make directory readonly to cause WriteFile to fail
 	err := os.Chmod(tempDir, 0555) // Read and execute only
 	if err != nil {
 		t.Skip("Cannot change directory permissions on this system")
 	}
 	defer func() { _ = os.Chmod(tempDir, 0755) }() // Restore permissions
-	
+
 	cluster := config.Cluster{
 		ID:         "c-cluster1",
 		Name:       "test-cluster",
 		ServerID:   "server-1",
 		ServerName: "Test Server",
 	}
-	
+
 	kubeconfigContent := []byte("test content")
-	
+
 	manager := NewManager(tempDir)
-	
+
 	_, err = manager.SaveKubeconfig(cluster, kubeconfigContent)
 	if err == nil {
 		t.Skip("Expected error writing file to readonly directory, but operation succeeded")
 	}
-	
+
 	if !strings.Contains(err.Error(), "failed to write kubeconfig file") {
 		t.Errorf("Expected file write error, got: %v", err)
 	}
@@ -413,7 +413,7 @@ func TestKubeconfigManager_SaveKubeconfig_WriteFileError(t *testing.T) {
 func TestKubeconfigManager_MergeKubeconfigs_OutputDirectoryCreateError(t *testing.T) {
 	// Test error path when output directory cannot be created
 	tempDir := t.TempDir()
-	
+
 	kubeconfig := []byte(`apiVersion: v1
 kind: Config
 clusters:
@@ -430,30 +430,30 @@ users:
 - name: admin
   user:
     token: test-token`)
-	
+
 	cluster := config.Cluster{
 		ID:         "c-cluster1",
 		Name:       "test-cluster",
 		ServerID:   "server-1",
 		ServerName: "Test Server",
 	}
-	
+
 	manager := NewManager(tempDir)
-	
+
 	path, err := manager.SaveKubeconfig(cluster, kubeconfig)
 	if err != nil {
 		t.Fatalf("Failed to save kubeconfig: %v", err)
 	}
-	
+
 	kubeconfigPaths := []string{path}
 	// Use a path that should fail to create (root directory)
 	outputPath := "/root/cannot_create/merged.yaml"
-	
+
 	err = manager.MergeKubeconfigs(kubeconfigPaths, outputPath)
 	if err == nil {
 		t.Skip("Expected error creating output directory, but operation succeeded")
 	}
-	
+
 	if !strings.Contains(err.Error(), "failed to create output directory") {
 		t.Errorf("Expected output directory creation error, got: %v", err)
 	}
@@ -463,19 +463,19 @@ func TestKubeconfigManager_MergeKubeconfigs_WriteOutputError(t *testing.T) {
 	// Test error path when output file write fails
 	tempDir := t.TempDir()
 	outputDir := filepath.Join(tempDir, "readonly")
-	
+
 	// Create output directory and make it readonly
 	err := os.MkdirAll(outputDir, 0755)
 	if err != nil {
 		t.Fatalf("Failed to create output directory: %v", err)
 	}
-	
+
 	err = os.Chmod(outputDir, 0555) // Read and execute only
 	if err != nil {
 		t.Skip("Cannot change directory permissions on this system")
 	}
 	defer func() { _ = os.Chmod(outputDir, 0755) }() // Restore permissions
-	
+
 	kubeconfig := []byte(`apiVersion: v1
 kind: Config
 clusters:
@@ -492,29 +492,29 @@ users:
 - name: admin
   user:
     token: test-token`)
-	
+
 	cluster := config.Cluster{
 		ID:         "c-cluster1",
 		Name:       "test-cluster",
 		ServerID:   "server-1",
 		ServerName: "Test Server",
 	}
-	
+
 	manager := NewManager(tempDir)
-	
+
 	path, err := manager.SaveKubeconfig(cluster, kubeconfig)
 	if err != nil {
 		t.Fatalf("Failed to save kubeconfig: %v", err)
 	}
-	
+
 	kubeconfigPaths := []string{path}
 	outputPath := filepath.Join(outputDir, "merged.yaml")
-	
+
 	err = manager.MergeKubeconfigs(kubeconfigPaths, outputPath)
 	if err == nil {
 		t.Skip("Expected error writing output file to readonly directory, but operation succeeded")
 	}
-	
+
 	if !strings.Contains(err.Error(), "failed to write merged kubeconfig") {
 		t.Errorf("Expected output file write error, got: %v", err)
 	}
@@ -575,17 +575,17 @@ users:
 	// Parse the saved content to verify rewriting
 	contentStr := string(content)
 	expectedUniqueName := "local-rancher-example-com"
-	
+
 	// Check that "local" references have been replaced with unique name
 	if !strings.Contains(contentStr, expectedUniqueName) {
 		t.Errorf("Expected kubeconfig to contain unique name '%s', but it doesn't. Content:\n%s", expectedUniqueName, contentStr)
 	}
-	
+
 	// Check that server URL is preserved
 	if !strings.Contains(contentStr, "https://rancher.example.com:6443") {
 		t.Error("Expected server URL to be preserved in kubeconfig")
 	}
-	
+
 	// Check that token is preserved
 	if !strings.Contains(contentStr, "test-token") {
 		t.Error("Expected user token to be preserved in kubeconfig")
@@ -598,7 +598,7 @@ func TestKubeconfigManager_SaveKubeconfig_NonLocalCluster(t *testing.T) {
 	cluster := config.Cluster{
 		ID:         "c-m-xyz123",
 		Name:       "production-cluster",
-		ServerID:   "server-1", 
+		ServerID:   "server-1",
 		ServerName: "Test Server",
 		ServerURL:  "https://rancher.example.com",
 	}
@@ -670,7 +670,7 @@ func TestKubeconfigManager_SaveKubeconfig_LocalClusterNameOnly(t *testing.T) {
 		ID:         "c-m-xyz123", // Different ID, but Name is "local"
 		Name:       "local",
 		ServerID:   "server-1",
-		ServerName: "Test Server", 
+		ServerName: "Test Server",
 		ServerURL:  "https://rancher.example.com",
 	}
 

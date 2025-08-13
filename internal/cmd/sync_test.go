@@ -66,7 +66,7 @@ func TestSyncProcessor_ProcessServers_ContextCancellation(t *testing.T) {
 
 	// Create a context that will be cancelled after a short delay
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	servers := []config.RancherServer{
 		{
 			ID:       "server-1",
@@ -281,7 +281,7 @@ func TestSyncProcessor_processClusters_EmptyList(t *testing.T) {
 
 	ctx := context.Background()
 	clusters := []config.Cluster{}
-	
+
 	var kubeconfigPaths []string
 	var pathsMutex sync.Mutex
 
@@ -313,7 +313,7 @@ func TestSyncProcessor_processClusters_ContextCancellation(t *testing.T) {
 			ServerName: "Test Server",
 		},
 	}
-	
+
 	var kubeconfigPaths []string
 	var pathsMutex sync.Mutex
 
@@ -361,7 +361,7 @@ func TestSyncProcessor_processClusters_ConcurrentProcessing(t *testing.T) {
 			ServerName: "Test Server",
 		},
 	}
-	
+
 	var kubeconfigPaths []string
 	var pathsMutex sync.Mutex
 
@@ -400,7 +400,7 @@ func TestSyncProcessor_processCluster_InvalidCluster(t *testing.T) {
 		ServerID:   "server-1",
 		ServerName: "Test Server",
 	}
-	
+
 	var kubeconfigPaths []string
 	var pathsMutex sync.Mutex
 
@@ -439,7 +439,7 @@ func TestSyncProcessor_processCluster_ContextTimeout(t *testing.T) {
 		ServerID:   "server-1",
 		ServerName: "Test Server",
 	}
-	
+
 	var kubeconfigPaths []string
 	var pathsMutex sync.Mutex
 
@@ -476,7 +476,7 @@ func TestSyncProcessor_processCluster_ThreadSafety(t *testing.T) {
 		ServerID:   "server-1",
 		ServerName: "Test Server",
 	}
-	
+
 	var kubeconfigPaths []string
 	var pathsMutex sync.Mutex
 
@@ -584,13 +584,13 @@ func TestRunSync_NoServersConfigured(t *testing.T) {
 	// Create a temporary directory for test config
 	tempDir := t.TempDir()
 	tempConfigPath := filepath.Join(tempDir, "config.yaml")
-	
+
 	// Create empty config file
 	emptyConfig := &config.Config{
 		Version: "1.0",
 		Servers: []config.RancherServer{},
 	}
-	
+
 	manager := config.NewConfigManager(tempConfigPath)
 	err := manager.SaveConfig(emptyConfig)
 	if err != nil {
@@ -616,7 +616,7 @@ func TestRunSync_ConfigManagerError(t *testing.T) {
 	// Set an invalid home directory that will cause utils.GetConfigManager to fail
 	originalHome := os.Getenv("HOME")
 	defer func() { _ = os.Setenv("HOME", originalHome) }()
-	
+
 	// Set HOME to empty string which will cause the config path resolution to fail
 	_ = os.Setenv("HOME", "")
 
@@ -632,7 +632,7 @@ func TestRunSync_ConfigManagerError(t *testing.T) {
 func TestRunSync_LoadServersError(t *testing.T) {
 	// Create a temporary directory but no config file
 	tempDir := t.TempDir()
-	
+
 	// Set environment to use our test directory but don't create config
 	originalHome := os.Getenv("HOME")
 	defer func() { _ = os.Setenv("HOME", originalHome) }()
@@ -644,7 +644,7 @@ func TestRunSync_LoadServersError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create config directory: %v", err)
 	}
-	
+
 	// Write invalid YAML
 	err = os.WriteFile(configPath, []byte("invalid: yaml: content: ["), 0644)
 	if err != nil {
@@ -677,7 +677,7 @@ func TestRunSync_GetKubeconfigDirError(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error when HOME environment variable is not set")
 	}
-	
+
 	if !strings.Contains(err.Error(), "failed to get home directory") {
 		t.Errorf("Expected error about home directory, got: %v", err)
 	}
@@ -686,14 +686,14 @@ func TestRunSync_GetKubeconfigDirError(t *testing.T) {
 func TestRunSync_ProcessServersError(t *testing.T) {
 	// Create a temporary directory for test config
 	tempDir := t.TempDir()
-	
+
 	// Create config in standard location
 	configDir := filepath.Join(tempDir, ".config", "cowpoke")
 	err := os.MkdirAll(configDir, 0755)
 	if err != nil {
 		t.Fatalf("Failed to create config directory: %v", err)
 	}
-	
+
 	configPath := filepath.Join(configDir, "config.yaml")
 	testConfig := &config.Config{
 		Version: "1.0",
@@ -707,7 +707,7 @@ func TestRunSync_ProcessServersError(t *testing.T) {
 			},
 		},
 	}
-	
+
 	manager := config.NewConfigManager(configPath)
 	err = manager.SaveConfig(testConfig)
 	if err != nil {
@@ -720,7 +720,7 @@ func TestRunSync_ProcessServersError(t *testing.T) {
 	_ = os.Setenv("HOME", tempDir)
 
 	// This will fail during ProcessServers due to network issues
-	// but since our implementation handles errors gracefully, 
+	// but since our implementation handles errors gracefully,
 	// it should not return an error but will have no kubeconfigs
 	cmd := &cobra.Command{}
 	err = runSync(cmd, []string{})
@@ -735,7 +735,7 @@ func TestRunSync_NoKubeconfigsDownloaded(t *testing.T) {
 	// Create a temporary directory for test config
 	tempDir := t.TempDir()
 	tempConfigPath := filepath.Join(tempDir, "config.yaml")
-	
+
 	// Create config with servers that will fail to download kubeconfigs
 	testConfig := &config.Config{
 		Version: "1.0",
@@ -749,7 +749,7 @@ func TestRunSync_NoKubeconfigsDownloaded(t *testing.T) {
 			},
 		},
 	}
-	
+
 	manager := config.NewConfigManager(tempConfigPath)
 	err := manager.SaveConfig(testConfig)
 	if err != nil {
@@ -771,11 +771,11 @@ func TestRunSync_NoKubeconfigsDownloaded(t *testing.T) {
 }
 
 func TestRunSync_GetDefaultKubeconfigPathError(t *testing.T) {
-	// This test is difficult to trigger since GetDefaultKubeconfigPath 
+	// This test is difficult to trigger since GetDefaultKubeconfigPath
 	// uses the same HOME resolution as other functions.
 	// We'll create a scenario where everything works until that point
 	// by using a mock or by temporarily making the function fail.
-	
+
 	// For now, this test documents the expected behavior when
 	// GetDefaultKubeconfigPath fails - it should return an error.
 	t.Skip("Difficult to mock GetDefaultKubeconfigPath failure in current architecture")
@@ -788,7 +788,7 @@ func TestRunSync_MergeKubeconfigsError(t *testing.T) {
 	// 1. A filesystem permission error during merge
 	// 2. Invalid kubeconfig content
 	// 3. A mock of the kubeconfig manager
-	
+
 	// For now, this test documents the expected behavior when
 	// MergeKubeconfigs fails - it should return a wrapped error.
 	t.Skip("Requires complex setup to make MergeKubeconfigs fail after ProcessServers succeeds")
@@ -800,10 +800,10 @@ func TestRunSync_Success(t *testing.T) {
 	// 2. Successful authentication
 	// 3. Successful kubeconfig download
 	// 4. Successful merge operation
-	
+
 	// In a real-world scenario, this would require integration testing
 	// with mock HTTP servers or test containers.
-	
+
 	// For now, this test documents the expected behavior for a successful sync.
 	t.Skip("Requires mock HTTP servers to test successful sync end-to-end")
 }
@@ -834,7 +834,7 @@ func TestSyncProcessor_ProcessServers_ErrorReturned(t *testing.T) {
 	// Test the error path in ProcessServers when g.Wait() returns an error due to context cancellation
 	tempDir := t.TempDir()
 	manager := kubeconfig.NewManager(tempDir)
-	
+
 	var buf bytes.Buffer
 	logConfig := logging.Config{
 		Level:  logging.LevelInfo,
@@ -842,13 +842,13 @@ func TestSyncProcessor_ProcessServers_ErrorReturned(t *testing.T) {
 		Output: &buf,
 	}
 	logger := logging.NewLogger(logConfig)
-	
+
 	processor := NewSyncProcessor(manager, logger)
-	
+
 	// Create a context with an extremely short timeout to force cancellation during processing
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Nanosecond)
 	defer cancel()
-	
+
 	servers := []config.RancherServer{
 		{
 			ID:       "server-1",
@@ -858,21 +858,21 @@ func TestSyncProcessor_ProcessServers_ErrorReturned(t *testing.T) {
 			AuthType: "local",
 		},
 	}
-	
+
 	// Wait a moment to ensure context is canceled
 	time.Sleep(1 * time.Millisecond)
-	
+
 	kubeconfigPaths, err := processor.ProcessServers(ctx, servers)
-	
+
 	// Should return an error due to context cancellation
 	if err == nil {
 		t.Error("Expected error due to context cancellation")
 	}
-	
+
 	if kubeconfigPaths != nil {
 		t.Error("Expected nil kubeconfig paths when error occurs")
 	}
-	
+
 	if err != nil && !strings.Contains(err.Error(), "failed to collect passwords") && !strings.Contains(err.Error(), "sync failed") {
 		t.Errorf("Expected error to contain 'sync failed' or 'failed to collect passwords', got: %v", err)
 	}
@@ -882,7 +882,7 @@ func TestSyncProcessor_processSingleServer_SuccessfulAuthentication(t *testing.T
 	// Test the success path after authentication in processSingleServer
 	tempDir := t.TempDir()
 	manager := kubeconfig.NewManager(tempDir)
-	
+
 	var buf bytes.Buffer
 	logConfig := logging.Config{
 		Level:  logging.LevelInfo,
@@ -890,9 +890,9 @@ func TestSyncProcessor_processSingleServer_SuccessfulAuthentication(t *testing.T
 		Output: &buf,
 	}
 	logger := logging.NewLogger(logConfig)
-	
+
 	processor := NewSyncProcessor(manager, logger)
-	
+
 	ctx := context.Background()
 	server := config.RancherServer{
 		ID:       "test-server",
@@ -901,14 +901,14 @@ func TestSyncProcessor_processSingleServer_SuccessfulAuthentication(t *testing.T
 		Username: "admin",
 		AuthType: "local",
 	}
-	
+
 	var kubeconfigPaths []string
 	var pathsMutex sync.Mutex
-	
+
 	// This will test the authentication failure path since we can't easily mock a successful auth
 	// But it exercises the error handling and logging code paths
 	err := processor.processSingleServer(ctx, server, "test-password", &kubeconfigPaths, &pathsMutex)
-	
+
 	// Should return nil (not an error) since errors are handled gracefully
 	if err != nil {
 		t.Errorf("Expected processSingleServer to handle errors gracefully, got: %v", err)
@@ -918,16 +918,16 @@ func TestSyncProcessor_processSingleServer_SuccessfulAuthentication(t *testing.T
 func TestSyncProcessor_processCluster_SaveKubeconfigError(t *testing.T) {
 	// Test the error path when SaveKubeconfig fails in processCluster
 	tempDir := t.TempDir()
-	
+
 	// Create a read-only directory to cause SaveKubeconfig to fail
 	readOnlyDir := filepath.Join(tempDir, "readonly")
 	err := os.MkdirAll(readOnlyDir, 0444) // Read-only permissions
 	if err != nil {
 		t.Fatalf("Failed to create read-only directory: %v", err)
 	}
-	
+
 	manager := kubeconfig.NewManager(readOnlyDir)
-	
+
 	var buf bytes.Buffer
 	logConfig := logging.Config{
 		Level:  logging.LevelInfo,
@@ -935,30 +935,30 @@ func TestSyncProcessor_processCluster_SaveKubeconfigError(t *testing.T) {
 		Output: &buf,
 	}
 	logger := logging.NewLogger(logConfig)
-	
+
 	processor := NewSyncProcessor(manager, logger)
-	
+
 	ctx := context.Background()
 	cluster := config.Cluster{
 		ID:   "test-cluster",
 		Name: "Test Cluster",
 	}
-	
+
 	// Create a mock client that will succeed in getting kubeconfig
 	client := rancher.NewClient(config.RancherServer{
 		URL:      "https://test.example.com",
 		Username: "admin",
 		AuthType: "local",
 	})
-	
+
 	var kubeconfigPaths []string
 	var pathsMutex sync.Mutex
 	serverLogger := logger.WithServer("https://test.example.com", "local")
-	
+
 	// This will test the GetKubeconfig failure path since we can't authenticate
 	// But it exercises the error handling code paths
 	err = processor.processCluster(ctx, cluster, "test-server", "https://test.example.com", client, &kubeconfigPaths, &pathsMutex, serverLogger)
-	
+
 	// Should return nil (not an error) since errors are handled gracefully
 	if err != nil {
 		t.Errorf("Expected processCluster to handle errors gracefully, got: %v", err)
@@ -969,21 +969,21 @@ func TestSyncProcessor_ProcessServers_SemaphoreCancellation(t *testing.T) {
 	// Test context cancellation while waiting for semaphore
 	tempDir := t.TempDir()
 	manager := kubeconfig.NewManager(tempDir)
-	
+
 	var buf bytes.Buffer
 	logConfig := logging.Config{
 		Level:  logging.LevelInfo,
-		Format: "text", 
+		Format: "text",
 		Output: &buf,
 	}
 	logger := logging.NewLogger(logConfig)
-	
+
 	processor := NewSyncProcessor(manager, logger)
-	
+
 	// Create a context with a very short timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 	defer cancel()
-	
+
 	// Create more servers than the semaphore limit (3) to force queueing
 	servers := []config.RancherServer{
 		{ID: "server-1", Name: "Server 1", URL: "https://rancher1.example.com", Username: "admin", AuthType: "local"},
@@ -992,17 +992,17 @@ func TestSyncProcessor_ProcessServers_SemaphoreCancellation(t *testing.T) {
 		{ID: "server-4", Name: "Server 4", URL: "https://rancher4.example.com", Username: "admin", AuthType: "local"},
 		{ID: "server-5", Name: "Server 5", URL: "https://rancher5.example.com", Username: "admin", AuthType: "local"},
 	}
-	
+
 	// Allow a moment for the timeout to trigger
 	time.Sleep(5 * time.Millisecond)
-	
+
 	kubeconfigPaths, err := processor.ProcessServers(ctx, servers)
-	
+
 	// Should return an error due to context timeout
 	if err == nil {
 		t.Error("Expected error due to context timeout")
 	}
-	
+
 	if kubeconfigPaths != nil {
 		t.Error("Expected nil kubeconfig paths when error occurs")
 	}
@@ -1010,23 +1010,23 @@ func TestSyncProcessor_ProcessServers_SemaphoreCancellation(t *testing.T) {
 
 func TestSyncCmd_OutputFlag(t *testing.T) {
 	// Test that the sync command has the output flag configured correctly
-	
+
 	// Check if the flag exists
 	outputFlag := syncCmd.Flags().Lookup("output")
 	if outputFlag == nil {
 		t.Error("Expected 'output' flag to be defined")
 		return
 	}
-	
+
 	// Check flag properties
 	if outputFlag.Shorthand != "o" {
 		t.Errorf("Expected shorthand 'o', got: %s", outputFlag.Shorthand)
 	}
-	
+
 	if outputFlag.DefValue != "" {
 		t.Errorf("Expected default value to be empty, got: %s", outputFlag.DefValue)
 	}
-	
+
 	expectedUsage := "Output directory or file path for merged kubeconfig (default: ~/.kube/config)"
 	if outputFlag.Usage != expectedUsage {
 		t.Errorf("Expected usage '%s', got: %s", expectedUsage, outputFlag.Usage)

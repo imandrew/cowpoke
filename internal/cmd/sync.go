@@ -25,9 +25,14 @@ By default, the merged kubeconfig is written to ~/.kube/config. Use the --output
 func init() {
 	rootCmd.AddCommand(syncCmd)
 	syncCmd.Flags().StringP("output", "o", "", "Output directory or file path for merged kubeconfig (default: ~/.kube/config)")
+	syncCmd.Flags().BoolP("verbose", "v", false, "Enable verbose logging")
 }
 
 func runSync(cmd *cobra.Command, args []string) error {
+	// Set verbose logging if requested
+	verbose, _ := cmd.Flags().GetBool("verbose")
+	logging.SetVerbose(verbose)
+
 	// Create context with timeout for the entire sync operation
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
@@ -57,7 +62,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	kubeconfigManager := kubeconfig.NewManager(kubeconfigDir)
 
 	// Create sync processor and process servers
-	logger := logging.Default().WithOperation("sync")
+	logger := logging.Get().With("operation", "sync")
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 	kubeconfigPaths, err := processor.ProcessServers(ctx, servers)
 	if err != nil {

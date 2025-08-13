@@ -8,9 +8,9 @@ import (
 
 	"cowpoke/internal/config"
 	"cowpoke/internal/kubeconfig"
-	"cowpoke/internal/logging"
 	"cowpoke/internal/rancher"
 	"cowpoke/internal/utils"
+	"log/slog"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -18,11 +18,11 @@ import (
 // SyncProcessor handles the business logic for syncing kubeconfigs from Rancher servers
 type SyncProcessor struct {
 	kubeconfigManager *kubeconfig.Manager
-	logger            *logging.Logger
+	logger            *slog.Logger
 }
 
 // NewSyncProcessor creates a new sync processor
-func NewSyncProcessor(kubeconfigManager *kubeconfig.Manager, logger *logging.Logger) *SyncProcessor {
+func NewSyncProcessor(kubeconfigManager *kubeconfig.Manager, logger *slog.Logger) *SyncProcessor {
 	return &SyncProcessor{
 		kubeconfigManager: kubeconfigManager,
 		logger:            logger,
@@ -63,7 +63,7 @@ func (sp *SyncProcessor) ProcessServers(ctx context.Context, servers []config.Ra
 
 	// Wait for all goroutines to complete
 	if err := g.Wait(); err != nil {
-		sp.logger.ErrorContext(ctx, "Error during concurrent sync", "error", err)
+		sp.logger.Error("Error during concurrent sync", "error", err)
 		return nil, fmt.Errorf("sync failed: %w", err)
 	}
 
@@ -83,7 +83,7 @@ func (sp *SyncProcessor) collectPasswords(ctx context.Context, servers []config.
 	if !utils.CanPromptForPassword() {
 		// For non-interactive environments (like tests), use a dummy password
 		// In production, this would typically indicate the need for stored credentials or tokens
-		sp.logger.WarnContext(ctx, "Cannot prompt for passwords in non-interactive environment, using fallback")
+		sp.logger.Warn("Cannot prompt for passwords in non-interactive environment, using fallback")
 		for _, server := range servers {
 			passwords[server.URL] = "test-fallback-password"
 		}
@@ -116,8 +116,8 @@ func (sp *SyncProcessor) processSingleServer(
 	kubeconfigPaths *[]string,
 	pathsMutex *sync.Mutex,
 ) error {
-	serverLogger := sp.logger.WithServer(server.URL, server.AuthType)
-	serverLogger.InfoContext(ctx, "Starting server processing")
+	serverLogger := sp.logger.With("server_url", server.URL, "auth_type", server.AuthType)
+	serverLogger.Info("Starting server processing")
 
 	client := rancher.NewClient(server)
 
@@ -127,11 +127,11 @@ func (sp *SyncProcessor) processSingleServer(
 
 	_, err := client.Authenticate(authCtx, password)
 	if err != nil {
-		serverLogger.ErrorContext(ctx, "Authentication failed", "error", err)
+		serverLogger.Error("Authentication failed", "error", err)
 		// Don't return error here - continue with other servers
 		return nil
 	}
-	serverLogger.InfoContext(ctx, "Authentication successful")
+	serverLogger.Info("Authentication successful")
 
 	// Create context with timeout for getting clusters
 	clustersCtx, clustersCancel := context.WithTimeout(ctx, 30*time.Second)
@@ -139,11 +139,11 @@ func (sp *SyncProcessor) processSingleServer(
 
 	clusters, err := client.GetClusters(clustersCtx)
 	if err != nil {
-		serverLogger.ErrorContext(ctx, "Failed to get clusters", "error", err)
+		serverLogger.Error("Failed to get clusters", "error", err)
 		return nil // Continue with other servers
 	}
 
-	serverLogger.InfoContext(ctx, "Retrieved clusters", "count", len(clusters))
+	serverLogger.Info("Retrieved clusters", "count", len(clusters))
 
 	return sp.processClusters(ctx, clusters, server.ID, server.URL, client, kubeconfigPaths, pathsMutex, serverLogger)
 }
@@ -157,7 +157,7 @@ func (sp *SyncProcessor) processClusters(
 	client *rancher.Client,
 	kubeconfigPaths *[]string,
 	pathsMutex *sync.Mutex,
-	serverLogger *logging.Logger,
+	serverLogger *slog.Logger,
 ) error {
 	// Process clusters concurrently within this server
 	clusterGroup, clusterCtx := errgroup.WithContext(ctx)
@@ -180,11 +180,11 @@ func (sp *SyncProcessor) processClusters(
 
 	// Wait for all clusters to be processed
 	if err := clusterGroup.Wait(); err != nil {
-		serverLogger.ErrorContext(ctx, "Error processing clusters", "error", err)
+		serverLogger.Error("Error processing clusters", "error", err)
 		return nil // Don't fail the entire sync for one server
 	}
 
-	serverLogger.InfoContext(ctx, "Server processing completed successfully")
+	serverLogger.Info("Server processing completed successfully")
 	return nil
 }
 
@@ -197,10 +197,10 @@ func (sp *SyncProcessor) processCluster(
 	client *rancher.Client,
 	kubeconfigPaths *[]string,
 	pathsMutex *sync.Mutex,
-	serverLogger *logging.Logger,
+	serverLogger *slog.Logger,
 ) error {
-	clusterLogger := serverLogger.WithCluster(cluster.ID, cluster.Name)
-	clusterLogger.InfoContext(ctx, "Processing cluster")
+	clusterLogger := serverLogger.With("cluster_id", cluster.ID, "cluster_name", cluster.Name)
+	clusterLogger.Info("Processing cluster")
 
 	// Create context with timeout for getting kubeconfig
 	kubeconfigCtx, kubeconfigCancel := context.WithTimeout(ctx, 60*time.Second)
@@ -208,7 +208,7 @@ func (sp *SyncProcessor) processCluster(
 
 	kubeconfigData, err := client.GetKubeconfig(kubeconfigCtx, cluster.ID)
 	if err != nil {
-		clusterLogger.ErrorContext(ctx, "Failed to get kubeconfig", "error", err)
+		clusterLogger.Error("Failed to get kubeconfig", "error", err)
 		return nil // Continue with other clusters
 	}
 
@@ -216,7 +216,7 @@ func (sp *SyncProcessor) processCluster(
 	cluster.ServerURL = serverURL
 	savedPath, err := sp.kubeconfigManager.SaveKubeconfig(cluster, kubeconfigData)
 	if err != nil {
-		clusterLogger.ErrorContext(ctx, "Failed to save kubeconfig", "error", err)
+		clusterLogger.Error("Failed to save kubeconfig", "error", err)
 		return nil // Continue with other clusters
 	}
 
@@ -225,6 +225,6 @@ func (sp *SyncProcessor) processCluster(
 	*kubeconfigPaths = append(*kubeconfigPaths, savedPath)
 	pathsMutex.Unlock()
 
-	clusterLogger.InfoContext(ctx, "Cluster processed successfully", "path", savedPath)
+	clusterLogger.Info("Cluster processed successfully", "path", savedPath)
 	return nil
 }

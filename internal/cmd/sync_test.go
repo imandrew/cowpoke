@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"os"
@@ -23,7 +22,7 @@ import (
 
 func TestNewSyncProcessor(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
@@ -42,7 +41,7 @@ func TestNewSyncProcessor(t *testing.T) {
 
 func TestSyncProcessor_ProcessServers_EmptyList(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	ctx := context.Background()
@@ -61,7 +60,7 @@ func TestSyncProcessor_ProcessServers_EmptyList(t *testing.T) {
 
 func TestSyncProcessor_ProcessServers_ContextCancellation(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	// Create a context that will be cancelled after a short delay
@@ -94,7 +93,7 @@ func TestSyncProcessor_ProcessServers_ContextCancellation(t *testing.T) {
 
 func TestSyncProcessor_ProcessServers_SemaphoreLimit(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	ctx := context.Background()
@@ -129,7 +128,7 @@ func TestSyncProcessor_ProcessServers_SemaphoreLimit(t *testing.T) {
 
 func TestSyncProcessor_ProcessServers_ConcurrentProcessing(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	ctx := context.Background()
@@ -174,7 +173,7 @@ func TestSyncProcessor_ProcessServers_ConcurrentProcessing(t *testing.T) {
 
 func TestSyncProcessor_processSingleServer_ContextTimeout(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	// Create a context with very short timeout
@@ -206,7 +205,7 @@ func TestSyncProcessor_processSingleServer_ContextTimeout(t *testing.T) {
 
 func TestSyncProcessor_processSingleServer_InvalidServer(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	ctx := context.Background()
@@ -237,7 +236,7 @@ func TestSyncProcessor_processSingleServer_InvalidServer(t *testing.T) {
 
 func TestSyncProcessor_processSingleServer_ThreadSafety(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	ctx := context.Background()
@@ -276,7 +275,7 @@ func TestSyncProcessor_processSingleServer_ThreadSafety(t *testing.T) {
 
 func TestSyncProcessor_processClusters_EmptyList(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	ctx := context.Background()
@@ -298,7 +297,7 @@ func TestSyncProcessor_processClusters_EmptyList(t *testing.T) {
 
 func TestSyncProcessor_processClusters_ContextCancellation(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	// Create a context that will be cancelled
@@ -335,7 +334,7 @@ func TestSyncProcessor_processClusters_ContextCancellation(t *testing.T) {
 
 func TestSyncProcessor_processClusters_ConcurrentProcessing(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	ctx := context.Background()
@@ -389,7 +388,7 @@ func TestSyncProcessor_processClusters_ConcurrentProcessing(t *testing.T) {
 
 func TestSyncProcessor_processCluster_InvalidCluster(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	ctx := context.Background()
@@ -426,7 +425,7 @@ func TestSyncProcessor_processCluster_InvalidCluster(t *testing.T) {
 
 func TestSyncProcessor_processCluster_ContextTimeout(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	// Create a context with very short timeout
@@ -465,7 +464,7 @@ func TestSyncProcessor_processCluster_ContextTimeout(t *testing.T) {
 
 func TestSyncProcessor_processCluster_ThreadSafety(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	ctx := context.Background()
@@ -512,7 +511,7 @@ func TestSyncProcessor_processCluster_ThreadSafety(t *testing.T) {
 // Integration test to verify the overall flow
 func TestSyncProcessor_Integration(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	ctx := context.Background()
@@ -550,7 +549,7 @@ func TestSyncProcessor_Integration(t *testing.T) {
 // Test error handling patterns
 func TestSyncProcessor_ErrorHandling(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
-	logger := logging.NewLogger(logging.DefaultConfig())
+	logger := logging.Get()
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 
 	ctx := context.Background()
@@ -835,13 +834,7 @@ func TestSyncProcessor_ProcessServers_ErrorReturned(t *testing.T) {
 	tempDir := t.TempDir()
 	manager := kubeconfig.NewManager(tempDir)
 
-	var buf bytes.Buffer
-	logConfig := logging.Config{
-		Level:  logging.LevelInfo,
-		Format: "text",
-		Output: &buf,
-	}
-	logger := logging.NewLogger(logConfig)
+	logger := logging.Get()
 
 	processor := NewSyncProcessor(manager, logger)
 
@@ -883,13 +876,7 @@ func TestSyncProcessor_processSingleServer_SuccessfulAuthentication(t *testing.T
 	tempDir := t.TempDir()
 	manager := kubeconfig.NewManager(tempDir)
 
-	var buf bytes.Buffer
-	logConfig := logging.Config{
-		Level:  logging.LevelInfo,
-		Format: "text",
-		Output: &buf,
-	}
-	logger := logging.NewLogger(logConfig)
+	logger := logging.Get()
 
 	processor := NewSyncProcessor(manager, logger)
 
@@ -928,13 +915,7 @@ func TestSyncProcessor_processCluster_SaveKubeconfigError(t *testing.T) {
 
 	manager := kubeconfig.NewManager(readOnlyDir)
 
-	var buf bytes.Buffer
-	logConfig := logging.Config{
-		Level:  logging.LevelInfo,
-		Format: "text",
-		Output: &buf,
-	}
-	logger := logging.NewLogger(logConfig)
+	logger := logging.Get()
 
 	processor := NewSyncProcessor(manager, logger)
 
@@ -953,7 +934,7 @@ func TestSyncProcessor_processCluster_SaveKubeconfigError(t *testing.T) {
 
 	var kubeconfigPaths []string
 	var pathsMutex sync.Mutex
-	serverLogger := logger.WithServer("https://test.example.com", "local")
+	serverLogger := logger.With("server_url", "https://test.example.com", "auth_type", "local")
 
 	// This will test the GetKubeconfig failure path since we can't authenticate
 	// But it exercises the error handling code paths
@@ -970,13 +951,7 @@ func TestSyncProcessor_ProcessServers_SemaphoreCancellation(t *testing.T) {
 	tempDir := t.TempDir()
 	manager := kubeconfig.NewManager(tempDir)
 
-	var buf bytes.Buffer
-	logConfig := logging.Config{
-		Level:  logging.LevelInfo,
-		Format: "text",
-		Output: &buf,
-	}
-	logger := logging.NewLogger(logConfig)
+	logger := logging.Get()
 
 	processor := NewSyncProcessor(manager, logger)
 

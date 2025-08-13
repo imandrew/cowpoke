@@ -268,7 +268,7 @@ func (s Strategy) calculateDelay(attempt int) time.Duration {
 
 // doWithRetry executes the given function with retries according to the strategy
 func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFunc) error {
-	logger := logging.Default().WithOperation("retry")
+	logger := logging.Default().With("operation", "retry")
 
 	var lastErr error
 	var allErrors []error
@@ -278,7 +278,7 @@ func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFun
 		err := fn()
 		if err == nil {
 			if attempt > 1 {
-				logger.InfoContext(ctx, "Operation succeeded after retry",
+				logger.Info("Operation succeeded after retry",
 					"attempt", attempt,
 					"total_attempts", strategy.MaxAttempts)
 			}
@@ -288,14 +288,14 @@ func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFun
 		lastErr = err
 		allErrors = append(allErrors, err)
 
-		logger.WarnContext(ctx, "Operation failed",
+		logger.Warn("Operation failed",
 			"error", err,
 			"attempt", attempt,
 			"max_attempts", strategy.MaxAttempts)
 
 		// Check if this error is retryable
 		if !isRetryable(err) {
-			logger.DebugContext(ctx, "Error is not retryable, stopping retry attempts", "error", err)
+			logger.Debug("Error is not retryable, stopping retry attempts", "error", err)
 			break
 		}
 
@@ -306,13 +306,13 @@ func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFun
 
 		// Calculate delay and wait
 		delay := strategy.calculateDelay(attempt)
-		logger.DebugContext(ctx, "Waiting before retry",
+		logger.Debug("Waiting before retry",
 			"delay", delay,
 			"next_attempt", attempt+1)
 
 		select {
 		case <-ctx.Done():
-			logger.DebugContext(ctx, "Context cancelled during retry delay")
+			logger.Debug("Context cancelled during retry delay")
 			return fmt.Errorf("retry cancelled: %w", ctx.Err())
 		case <-time.After(delay):
 			// Continue to next attempt
@@ -321,7 +321,7 @@ func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFun
 
 	// All attempts failed, return appropriate error
 	if len(allErrors) > 1 {
-		logger.ErrorContext(ctx, "All retry attempts failed",
+		logger.Error("All retry attempts failed",
 			"attempts", len(allErrors),
 			"last_error", lastErr)
 		return errors.NewMultiError(allErrors)

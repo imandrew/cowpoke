@@ -250,14 +250,14 @@ func Join(errs ...error) error {
 			nonNilErrors = append(nonNilErrors, err)
 		}
 	}
-	
+
 	if len(nonNilErrors) == 0 {
 		return nil
 	}
 	if len(nonNilErrors) == 1 {
 		return nonNilErrors[0]
 	}
-	
+
 	return NewMultiError(nonNilErrors)
 }
 
@@ -268,9 +268,9 @@ func IsNotFound(err error) bool {
 
 // IsUnauthorized checks if an error represents an authorization failure
 func IsUnauthorized(err error) bool {
-	return errors.Is(err, ErrUnauthorized) || 
-		   IsHTTPStatus(err, http.StatusUnauthorized) ||
-		   IsHTTPStatus(err, http.StatusForbidden)
+	return errors.Is(err, ErrUnauthorized) ||
+		IsHTTPStatus(err, http.StatusUnauthorized) ||
+		IsHTTPStatus(err, http.StatusForbidden)
 }
 
 // IsNetwork checks if an error is network-related

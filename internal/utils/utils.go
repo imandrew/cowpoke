@@ -18,19 +18,19 @@ import (
 // PromptForPassword prompts the user for a password without echoing it to the terminal
 func PromptForPassword(prompt string) (string, error) {
 	fmt.Print(prompt)
-	
+
 	// Get the file descriptor for stdin
 	fd := int(syscall.Stdin)
-	
+
 	// Read password without echo
 	password, err := term.ReadPassword(fd)
 	if err != nil {
 		return "", fmt.Errorf("failed to read password: %w", err)
 	}
-	
+
 	// Print a newline since ReadPassword doesn't
 	fmt.Println()
-	
+
 	return string(password), nil
 }
 
@@ -111,35 +111,35 @@ func SanitizeURL(url string) string {
 	// Remove protocol
 	cleaned := strings.TrimPrefix(url, "https://")
 	cleaned = strings.TrimPrefix(cleaned, "http://")
-	
+
 	// Remove port if present
 	if idx := strings.Index(cleaned, ":"); idx != -1 {
 		cleaned = cleaned[:idx]
 	}
-	
+
 	// Remove path if present
 	if idx := strings.Index(cleaned, "/"); idx != -1 {
 		cleaned = cleaned[:idx]
 	}
-	
+
 	// Replace dots with dashes
 	cleaned = strings.ReplaceAll(cleaned, ".", "-")
-	
+
 	// Replace any other invalid characters with dashes
 	invalidChars := regexp.MustCompile(`[^a-zA-Z0-9\-]`)
 	cleaned = invalidChars.ReplaceAllString(cleaned, "-")
-	
+
 	// Remove consecutive dashes
 	multipleDashes := regexp.MustCompile(`-+`)
 	cleaned = multipleDashes.ReplaceAllString(cleaned, "-")
-	
+
 	// Trim dashes from start and end
 	cleaned = strings.Trim(cleaned, "-")
-	
+
 	// Ensure result is not empty
 	if cleaned == "" {
 		cleaned = "unknown-server"
 	}
-	
+
 	return cleaned
 }

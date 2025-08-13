@@ -16,10 +16,10 @@ import (
 var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync kubeconfigs from all Rancher servers",
-	Long:  `Download kubeconfigs from all configured Rancher servers and merge them into a kubeconfig file.
+	Long: `Download kubeconfigs from all configured Rancher servers and merge them into a kubeconfig file.
 	
 By default, the merged kubeconfig is written to ~/.kube/config. Use the --output flag to specify a different location.`,
-	RunE:  runSync,
+	RunE: runSync,
 }
 
 func init() {
@@ -111,8 +111,8 @@ func runSync(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to merge kubeconfigs: %w", err)
 	}
 
-	logger.InfoContext(ctx, "Sync operation completed successfully", 
-		"merged_count", len(kubeconfigPaths), 
+	logger.InfoContext(ctx, "Sync operation completed successfully",
+		"merged_count", len(kubeconfigPaths),
 		"output_path", finalOutputPath)
 	fmt.Printf("Successfully merged %d kubeconfigs into: %s\n", len(kubeconfigPaths), finalOutputPath)
 	return nil

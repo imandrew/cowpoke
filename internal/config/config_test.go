@@ -66,7 +66,7 @@ func TestAuthRegistry_Register(t *testing.T) {
 
 	// Test initial registration
 	registry.Register(provider)
-	
+
 	if len(registry.providers) != 1 {
 		t.Errorf("Expected 1 provider after registration, got %d", len(registry.providers))
 	}
@@ -137,7 +137,7 @@ func TestAuthRegistry_Get(t *testing.T) {
 
 func TestAuthRegistry_All(t *testing.T) {
 	registry := NewAuthRegistry()
-	
+
 	// Test empty registry
 	all := registry.All()
 	if len(all) != 0 {
@@ -171,7 +171,7 @@ func TestAuthRegistry_All(t *testing.T) {
 
 func TestAuthRegistry_IsValid(t *testing.T) {
 	registry := NewAuthRegistry()
-	
+
 	// Test with empty registry
 	if registry.IsValid("local") {
 		t.Error("Expected 'local' to be invalid in empty registry")
@@ -194,7 +194,7 @@ func TestAuthRegistry_IsValid(t *testing.T) {
 
 func TestAuthRegistry_IDs(t *testing.T) {
 	registry := NewAuthRegistry()
-	
+
 	// Test empty registry
 	ids := registry.IDs()
 	if len(ids) != 0 {
@@ -228,7 +228,7 @@ func TestAuthRegistry_IDs(t *testing.T) {
 
 func TestAuthRegistry_String(t *testing.T) {
 	registry := NewAuthRegistry()
-	
+
 	// Test empty registry
 	str := registry.String()
 	if str != "[]" {
@@ -251,7 +251,7 @@ func TestAuthRegistry_String(t *testing.T) {
 func TestNewConfigManager(t *testing.T) {
 	path := "/test/config/path"
 	manager := NewConfigManager(path)
-	
+
 	if manager == nil {
 		t.Fatal("Expected NewConfigManager to return non-nil manager")
 	}
@@ -264,10 +264,10 @@ func TestNewConfigManager(t *testing.T) {
 func TestConfigManager_LoadConfig_NonExistentFile(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "nonexistent.yaml")
-	
+
 	manager := NewConfigManager(configPath)
 	config, err := manager.LoadConfig()
-	
+
 	if err != nil {
 		t.Fatalf("Expected no error for non-existent file, got: %v", err)
 	}
@@ -288,7 +288,7 @@ func TestConfigManager_LoadConfig_NonExistentFile(t *testing.T) {
 func TestConfigManager_LoadConfig_EmptyFile(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "empty.yaml")
-	
+
 	// Create empty file
 	err := os.WriteFile(configPath, []byte(""), 0644)
 	if err != nil {
@@ -297,7 +297,7 @@ func TestConfigManager_LoadConfig_EmptyFile(t *testing.T) {
 
 	manager := NewConfigManager(configPath)
 	config, err := manager.LoadConfig()
-	
+
 	if err != nil {
 		t.Fatalf("Expected no error for empty file, got: %v", err)
 	}
@@ -314,7 +314,7 @@ func TestConfigManager_LoadConfig_EmptyFile(t *testing.T) {
 func TestConfigManager_LoadConfig_ValidFile(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "valid.yaml")
-	
+
 	validYAML := `version: "1.0"
 servers:
   - id: "test-id"
@@ -323,7 +323,7 @@ servers:
     username: "admin"
     authType: "local"
 `
-	
+
 	err := os.WriteFile(configPath, []byte(validYAML), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create valid config file: %v", err)
@@ -331,7 +331,7 @@ servers:
 
 	manager := NewConfigManager(configPath)
 	config, err := manager.LoadConfig()
-	
+
 	if err != nil {
 		t.Fatalf("Expected no error for valid file, got: %v", err)
 	}
@@ -365,7 +365,7 @@ servers:
 func TestConfigManager_LoadConfig_InvalidYAML(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "invalid.yaml")
-	
+
 	invalidYAML := `version: "1.0"
 servers:
   - id: "test-id"
@@ -375,7 +375,7 @@ servers:
     authType: "local"
   invalid_yaml_here: [
 `
-	
+
 	err := os.WriteFile(configPath, []byte(invalidYAML), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create invalid config file: %v", err)
@@ -383,7 +383,7 @@ servers:
 
 	manager := NewConfigManager(configPath)
 	_, err = manager.LoadConfig()
-	
+
 	if err == nil {
 		t.Error("Expected error for invalid YAML file")
 	}
@@ -397,7 +397,7 @@ servers:
 func TestConfigManager_SaveConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "subdir", "config.yaml")
-	
+
 	manager := NewConfigManager(configPath)
 	config := &Config{
 		Version: "1.0",
@@ -448,7 +448,7 @@ func TestConfigManager_SaveConfig(t *testing.T) {
 func TestConfigManager_AddServer(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.yaml")
-	
+
 	manager := NewConfigManager(configPath)
 	server := RancherServer{
 		Name:     "Test Server",
@@ -484,7 +484,7 @@ func TestConfigManager_AddServer(t *testing.T) {
 func TestConfigManager_AddServer_InvalidAuthType(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.yaml")
-	
+
 	manager := NewConfigManager(configPath)
 	server := RancherServer{
 		Name:     "Test Server",
@@ -510,9 +510,9 @@ func TestConfigManager_AddServer_InvalidAuthType(t *testing.T) {
 func TestConfigManager_RemoveServer(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.yaml")
-	
+
 	manager := NewConfigManager(configPath)
-	
+
 	// Add a server first
 	server := RancherServer{
 		ID:       "test-id",
@@ -547,9 +547,9 @@ func TestConfigManager_RemoveServer(t *testing.T) {
 func TestConfigManager_RemoveServer_NotFound(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.yaml")
-	
+
 	manager := NewConfigManager(configPath)
-	
+
 	err := manager.RemoveServer("nonexistent-id")
 	if err == nil {
 		t.Error("Expected error when removing non-existent server")
@@ -567,9 +567,9 @@ func TestConfigManager_RemoveServer_NotFound(t *testing.T) {
 func TestConfigManager_RemoveServerByURL(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.yaml")
-	
+
 	manager := NewConfigManager(configPath)
-	
+
 	// Add a server first
 	server := RancherServer{
 		Name:     "Test Server",
@@ -603,9 +603,9 @@ func TestConfigManager_RemoveServerByURL(t *testing.T) {
 func TestConfigManager_RemoveServerByURL_NotFound(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.yaml")
-	
+
 	manager := NewConfigManager(configPath)
-	
+
 	err := manager.RemoveServerByURL("https://nonexistent.example.com")
 	if err == nil {
 		t.Error("Expected error when removing server by non-existent URL")
@@ -623,9 +623,9 @@ func TestConfigManager_RemoveServerByURL_NotFound(t *testing.T) {
 func TestConfigManager_GetServers(t *testing.T) {
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.yaml")
-	
+
 	manager := NewConfigManager(configPath)
-	
+
 	// Test empty config
 	servers, err := manager.GetServers()
 	if err != nil {
@@ -671,7 +671,7 @@ func TestSupportedAuthTypes_Integration(t *testing.T) {
 
 	// Test that it contains expected auth types
 	expectedTypes := []string{"local", "github", "openldap", "activedirectory", "azuread", "okta", "ping", "keycloak", "shibboleth", "googleoauth"}
-	
+
 	for _, authType := range expectedTypes {
 		if !SupportedAuthTypes.IsValid(authType) {
 			t.Errorf("Expected auth type '%s' to be supported", authType)
@@ -732,7 +732,7 @@ func TestIsValidAuthType(t *testing.T) {
 
 func TestGetSupportedAuthTypesString(t *testing.T) {
 	str := GetSupportedAuthTypesString()
-	
+
 	if str == "" {
 		t.Error("Expected non-empty string from GetSupportedAuthTypesString")
 	}
@@ -748,9 +748,9 @@ func TestGetSupportedAuthTypesString(t *testing.T) {
 
 // Helper function
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && s[:len(substr)] == substr || 
-		   len(s) > len(substr) && s[len(s)-len(substr):] == substr ||
-		   len(s) > len(substr) && stringContains(s, substr)
+	return len(s) >= len(substr) && s[:len(substr)] == substr ||
+		len(s) > len(substr) && s[len(s)-len(substr):] == substr ||
+		len(s) > len(substr) && stringContains(s, substr)
 }
 
 func stringContains(s, substr string) bool {
@@ -768,27 +768,27 @@ func TestConfigManager_LoadConfig_ReadError(t *testing.T) {
 	// Test error path when file exists but can't be read (permissions)
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "unreadable.yaml")
-	
+
 	// Create file first
 	err := os.WriteFile(configPath, []byte("test content"), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create test file: %v", err)
 	}
-	
+
 	// Make file unreadable (this might not work on all systems)
 	err = os.Chmod(configPath, 0000)
 	if err != nil {
 		t.Skip("Cannot change file permissions on this system")
 	}
 	defer func() { _ = os.Chmod(configPath, 0644) }() // Restore permissions for cleanup
-	
+
 	manager := NewConfigManager(configPath)
 	_, err = manager.LoadConfig()
-	
+
 	if err == nil {
 		t.Skip("Expected error reading unreadable file, but got none (permissions not enforced)")
 	}
-	
+
 	if !contains(err.Error(), "configuration error") {
 		t.Errorf("Expected configuration error, got: %v", err)
 	}
@@ -798,18 +798,18 @@ func TestConfigManager_SaveConfig_DirectoryCreateError(t *testing.T) {
 	// Test error path when directory cannot be created
 	// Use a path that should fail to create (root directory on Unix systems)
 	invalidPath := "/root/cannot_create/config.yaml"
-	
+
 	manager := NewConfigManager(invalidPath)
 	config := &Config{
 		Version: "1.0",
 		Servers: []RancherServer{},
 	}
-	
+
 	err := manager.SaveConfig(config)
 	if err == nil {
 		t.Skip("Expected error creating directory, but operation succeeded")
 	}
-	
+
 	if !contains(err.Error(), "configuration error") {
 		t.Errorf("Expected configuration error, got: %v", err)
 	}
@@ -819,30 +819,30 @@ func TestConfigManager_SaveConfig_WriteError(t *testing.T) {
 	// Test error path when file write fails
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "readonly", "config.yaml")
-	
+
 	// Create directory and make it readonly
 	err := os.MkdirAll(filepath.Dir(configPath), 0755)
 	if err != nil {
 		t.Fatalf("Failed to create directory: %v", err)
 	}
-	
+
 	err = os.Chmod(filepath.Dir(configPath), 0555) // Read and execute only
 	if err != nil {
 		t.Skip("Cannot change directory permissions on this system")
 	}
 	defer func() { _ = os.Chmod(filepath.Dir(configPath), 0755) }() // Restore permissions
-	
+
 	manager := NewConfigManager(configPath)
 	config := &Config{
 		Version: "1.0",
 		Servers: []RancherServer{},
 	}
-	
+
 	err = manager.SaveConfig(config)
 	if err == nil {
 		t.Skip("Expected error writing to readonly directory, but operation succeeded")
 	}
-	
+
 	if !contains(err.Error(), "configuration error") {
 		t.Errorf("Expected configuration error, got: %v", err)
 	}
@@ -853,7 +853,7 @@ func TestConfigManager_AddServer_LoadConfigError(t *testing.T) {
 	// Use an invalid config file that will fail to unmarshal
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "invalid.yaml")
-	
+
 	// Create invalid YAML
 	invalidYAML := `version: "1.0"
 servers:
@@ -864,20 +864,20 @@ servers:
 	if err != nil {
 		t.Fatalf("Failed to create invalid config file: %v", err)
 	}
-	
+
 	manager := NewConfigManager(configPath)
 	server := RancherServer{
 		Name:     "Test Server",
-		URL:      "https://rancher.example.com", 
+		URL:      "https://rancher.example.com",
 		Username: "admin",
 		AuthType: "local",
 	}
-	
+
 	err = manager.AddServer(server)
 	if err == nil {
 		t.Error("Expected error when LoadConfig fails")
 	}
-	
+
 	if !contains(err.Error(), "failed to load config") {
 		t.Errorf("Expected 'failed to load config' error, got: %v", err)
 	}
@@ -886,36 +886,36 @@ servers:
 func TestConfigManager_AddServer_SaveConfigError(t *testing.T) {
 	// Test error path when SaveConfig fails in AddServer
 	tempDir := t.TempDir()
-	
+
 	// Start with a valid config
 	configPath := filepath.Join(tempDir, "config.yaml")
 	manager := NewConfigManager(configPath)
-	
+
 	// Create initial empty config
 	err := manager.SaveConfig(&Config{Version: "1.0", Servers: []RancherServer{}})
 	if err != nil {
 		t.Fatalf("Failed to create initial config: %v", err)
 	}
-	
+
 	// Make directory readonly to cause SaveConfig to fail
 	err = os.Chmod(tempDir, 0555)
 	if err != nil {
 		t.Skip("Cannot change directory permissions on this system")
 	}
 	defer func() { _ = os.Chmod(tempDir, 0755) }() // Restore permissions
-	
+
 	server := RancherServer{
 		Name:     "Test Server",
 		URL:      "https://rancher.example.com",
-		Username: "admin", 
+		Username: "admin",
 		AuthType: "local",
 	}
-	
+
 	err = manager.AddServer(server)
 	if err == nil {
 		t.Skip("Expected error when SaveConfig fails, but operation succeeded")
 	}
-	
+
 	// Should fail at SaveConfig, not at validation
 	if contains(err.Error(), "validation error") {
 		t.Errorf("Expected save error, not validation error, got: %v", err)
@@ -926,7 +926,7 @@ func TestConfigManager_AddServer_ExistingID(t *testing.T) {
 	// Test adding server with pre-existing ID
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "config.yaml")
-	
+
 	manager := NewConfigManager(configPath)
 	server := RancherServer{
 		ID:       "existing-id",
@@ -935,22 +935,22 @@ func TestConfigManager_AddServer_ExistingID(t *testing.T) {
 		Username: "admin",
 		AuthType: "local",
 	}
-	
+
 	err := manager.AddServer(server)
 	if err != nil {
 		t.Fatalf("Expected no error adding server with ID, got: %v", err)
 	}
-	
+
 	// Verify the ID was preserved
 	config, err := manager.LoadConfig()
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
-	
+
 	if len(config.Servers) != 1 {
 		t.Fatalf("Expected 1 server, got %d", len(config.Servers))
 	}
-	
+
 	if config.Servers[0].ID != "existing-id" {
 		t.Errorf("Expected ID to be preserved as 'existing-id', got %s", config.Servers[0].ID)
 	}
@@ -960,7 +960,7 @@ func TestConfigManager_RemoveServer_LoadConfigError(t *testing.T) {
 	// Test error path when LoadConfig fails in RemoveServer
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "invalid.yaml")
-	
+
 	// Create invalid YAML
 	invalidYAML := `version: "1.0"
 servers:
@@ -970,14 +970,14 @@ servers:
 	if err != nil {
 		t.Fatalf("Failed to create invalid config file: %v", err)
 	}
-	
+
 	manager := NewConfigManager(configPath)
 	err = manager.RemoveServer("any-id")
-	
+
 	if err == nil {
 		t.Error("Expected error when LoadConfig fails")
 	}
-	
+
 	if !contains(err.Error(), "failed to load config") {
 		t.Errorf("Expected 'failed to load config' error, got: %v", err)
 	}
@@ -987,21 +987,21 @@ func TestConfigManager_RemoveServerByURL_LoadConfigError(t *testing.T) {
 	// Test error path when LoadConfig fails in RemoveServerByURL
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "invalid.yaml")
-	
+
 	// Create invalid YAML
 	invalidYAML := `invalid yaml content`
 	err := os.WriteFile(configPath, []byte(invalidYAML), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create invalid config file: %v", err)
 	}
-	
+
 	manager := NewConfigManager(configPath)
 	err = manager.RemoveServerByURL("https://any.url.com")
-	
+
 	if err == nil {
 		t.Error("Expected error when LoadConfig fails")
 	}
-	
+
 	if !contains(err.Error(), "failed to load config") {
 		t.Errorf("Expected 'failed to load config' error, got: %v", err)
 	}
@@ -1011,7 +1011,7 @@ func TestConfigManager_GetServers_LoadConfigError(t *testing.T) {
 	// Test error path when LoadConfig fails in GetServers
 	tempDir := t.TempDir()
 	configPath := filepath.Join(tempDir, "invalid.yaml")
-	
+
 	// Create invalid YAML that will fail to unmarshal
 	invalidYAML := `version: "1.0"
 servers:
@@ -1022,18 +1022,18 @@ servers:
 	if err != nil {
 		t.Fatalf("Failed to create invalid config file: %v", err)
 	}
-	
+
 	manager := NewConfigManager(configPath)
 	servers, err := manager.GetServers()
-	
+
 	if err == nil {
 		t.Error("Expected error when LoadConfig fails")
 	}
-	
+
 	if servers != nil {
 		t.Error("Expected servers to be nil when error occurs")
 	}
-	
+
 	// The error should propagate from LoadConfig
 	if err != nil && !contains(err.Error(), "configuration error") {
 		t.Errorf("Expected configuration error, got: %v", err)

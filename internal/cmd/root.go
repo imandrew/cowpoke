@@ -13,7 +13,7 @@ var cfgFile string
 // Build information
 var (
 	version = "dev"
-	commit  = "none" 
+	commit  = "none"
 	date    = "unknown"
 	builtBy = "unknown"
 )

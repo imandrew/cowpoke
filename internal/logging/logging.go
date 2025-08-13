@@ -73,7 +73,7 @@ func NewLogger(config Config) *Logger {
 // WithContext adds context to the logger
 func (l *Logger) WithContext(ctx context.Context) *Logger {
 	return &Logger{
-		Logger: l.Logger.With(),
+		Logger: l.With(),
 	}
 }
 
@@ -84,7 +84,7 @@ func (l *Logger) WithFields(fields map[string]any) *Logger {
 		args = append(args, k, v)
 	}
 	return &Logger{
-		Logger: l.Logger.With(args...),
+		Logger: l.With(args...),
 	}
 }
 

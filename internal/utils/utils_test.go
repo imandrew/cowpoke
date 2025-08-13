@@ -56,11 +56,11 @@ func TestPathsWithInvalidHome(t *testing.T) {
 	// Save original HOME
 	origHome := os.Getenv("HOME")
 	defer func() {
-		os.Setenv("HOME", origHome)
+		_ = os.Setenv("HOME", origHome)
 	}()
 
 	// Set invalid HOME
-	os.Unsetenv("HOME")
+	_ = os.Unsetenv("HOME")
 
 	_, err := GetConfigPath()
 	if err == nil {

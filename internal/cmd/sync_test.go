@@ -261,7 +261,7 @@ func TestSyncProcessor_processSingleServer_ThreadSafety(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			processor.processSingleServer(ctx, server, "test-password", &kubeconfigPaths, &pathsMutex)
+			_ = processor.processSingleServer(ctx, server, "test-password", &kubeconfigPaths, &pathsMutex)
 		}()
 	}
 
@@ -496,7 +496,7 @@ func TestSyncProcessor_processCluster_ThreadSafety(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			processor.processCluster(ctx, cluster, "server-1", "https://test.example.com", client, &kubeconfigPaths, &pathsMutex, logger)
+			_ = processor.processCluster(ctx, cluster, "server-1", "https://test.example.com", client, &kubeconfigPaths, &pathsMutex, logger)
 		}()
 	}
 
@@ -599,8 +599,8 @@ func TestRunSync_NoServersConfigured(t *testing.T) {
 
 	// Set environment to use our test config
 	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
-	os.Setenv("HOME", tempDir)
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
+	_ = os.Setenv("HOME", tempDir)
 
 	// Create and run the command
 	cmd := &cobra.Command{}
@@ -615,10 +615,10 @@ func TestRunSync_NoServersConfigured(t *testing.T) {
 func TestRunSync_ConfigManagerError(t *testing.T) {
 	// Set an invalid home directory that will cause utils.GetConfigManager to fail
 	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
 	
 	// Set HOME to empty string which will cause the config path resolution to fail
-	os.Setenv("HOME", "")
+	_ = os.Setenv("HOME", "")
 
 	cmd := &cobra.Command{}
 	err := runSync(cmd, []string{})
@@ -635,8 +635,8 @@ func TestRunSync_LoadServersError(t *testing.T) {
 	
 	// Set environment to use our test directory but don't create config
 	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
-	os.Setenv("HOME", tempDir)
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
+	_ = os.Setenv("HOME", tempDir)
 
 	// Create invalid config file that will cause parsing error
 	configPath := filepath.Join(tempDir, ".config", "cowpoke", "config.yaml")
@@ -667,8 +667,8 @@ func TestRunSync_LoadServersError(t *testing.T) {
 func TestRunSync_GetKubeconfigDirError(t *testing.T) {
 	// Save original HOME and clear it to cause GetKubeconfigDir to fail
 	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
-	os.Unsetenv("HOME")
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
+	_ = os.Unsetenv("HOME")
 
 	cmd := &cobra.Command{}
 	err := runSync(cmd, []string{})
@@ -716,8 +716,8 @@ func TestRunSync_ProcessServersError(t *testing.T) {
 
 	// Set environment to use our test config
 	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
-	os.Setenv("HOME", tempDir)
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
+	_ = os.Setenv("HOME", tempDir)
 
 	// This will fail during ProcessServers due to network issues
 	// but since our implementation handles errors gracefully, 
@@ -758,8 +758,8 @@ func TestRunSync_NoKubeconfigsDownloaded(t *testing.T) {
 
 	// Set environment to use our test config
 	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
-	os.Setenv("HOME", tempDir)
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
+	_ = os.Setenv("HOME", tempDir)
 
 	cmd := &cobra.Command{}
 	err = runSync(cmd, []string{})

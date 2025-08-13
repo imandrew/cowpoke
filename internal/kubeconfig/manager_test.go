@@ -387,7 +387,7 @@ func TestKubeconfigManager_SaveKubeconfig_WriteFileError(t *testing.T) {
 	if err != nil {
 		t.Skip("Cannot change directory permissions on this system")
 	}
-	defer os.Chmod(tempDir, 0755) // Restore permissions
+	defer func() { _ = os.Chmod(tempDir, 0755) }() // Restore permissions
 	
 	cluster := config.Cluster{
 		ID:         "c-cluster1",
@@ -474,7 +474,7 @@ func TestKubeconfigManager_MergeKubeconfigs_WriteOutputError(t *testing.T) {
 	if err != nil {
 		t.Skip("Cannot change directory permissions on this system")
 	}
-	defer os.Chmod(outputDir, 0755) // Restore permissions
+	defer func() { _ = os.Chmod(outputDir, 0755) }() // Restore permissions
 	
 	kubeconfig := []byte(`apiVersion: v1
 kind: Config

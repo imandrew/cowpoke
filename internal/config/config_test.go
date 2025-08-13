@@ -780,7 +780,7 @@ func TestConfigManager_LoadConfig_ReadError(t *testing.T) {
 	if err != nil {
 		t.Skip("Cannot change file permissions on this system")
 	}
-	defer os.Chmod(configPath, 0644) // Restore permissions for cleanup
+	defer func() { _ = os.Chmod(configPath, 0644) }() // Restore permissions for cleanup
 	
 	manager := NewConfigManager(configPath)
 	_, err = manager.LoadConfig()
@@ -830,7 +830,7 @@ func TestConfigManager_SaveConfig_WriteError(t *testing.T) {
 	if err != nil {
 		t.Skip("Cannot change directory permissions on this system")
 	}
-	defer os.Chmod(filepath.Dir(configPath), 0755) // Restore permissions
+	defer func() { _ = os.Chmod(filepath.Dir(configPath), 0755) }() // Restore permissions
 	
 	manager := NewConfigManager(configPath)
 	config := &Config{
@@ -902,7 +902,7 @@ func TestConfigManager_AddServer_SaveConfigError(t *testing.T) {
 	if err != nil {
 		t.Skip("Cannot change directory permissions on this system")
 	}
-	defer os.Chmod(tempDir, 0755) // Restore permissions
+	defer func() { _ = os.Chmod(tempDir, 0755) }() // Restore permissions
 	
 	server := RancherServer{
 		Name:     "Test Server",

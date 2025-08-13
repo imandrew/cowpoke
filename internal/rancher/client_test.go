@@ -97,7 +97,7 @@ func TestClient_Authenticate_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(mockResponse))
+		_, _ = w.Write([]byte(mockResponse))
 	}))
 	defer server.Close()
 
@@ -128,7 +128,7 @@ func TestClient_Authenticate_Success(t *testing.T) {
 func TestClient_Authenticate_WrongCredentials(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"message": "Unauthorized"}`))
+		_, _ = w.Write([]byte(`{"message": "Unauthorized"}`))
 	}))
 	defer server.Close()
 
@@ -155,7 +155,7 @@ func TestClient_Authenticate_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`invalid json`))
+		_, _ = w.Write([]byte(`invalid json`))
 	}))
 	defer server.Close()
 
@@ -206,7 +206,7 @@ func TestClient_Authenticate_ContextCancellation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(200 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"token": "token-12345"}`))
+		_, _ = w.Write([]byte(`{"token": "token-12345"}`))
 	}))
 	defer server.Close()
 
@@ -261,7 +261,7 @@ func TestClient_GetClusters_Success(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(mockResponse))
+		_, _ = w.Write([]byte(mockResponse))
 	}))
 	defer server.Close()
 
@@ -311,7 +311,7 @@ func TestClient_GetClusters_Success(t *testing.T) {
 func TestClient_GetClusters_Unauthorized(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"message": "Unauthorized"}`))
+		_, _ = w.Write([]byte(`{"message": "Unauthorized"}`))
 	}))
 	defer server.Close()
 
@@ -354,7 +354,7 @@ func TestClient_GetClusters_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`invalid json`))
+		_, _ = w.Write([]byte(`invalid json`))
 	}))
 	defer server.Close()
 
@@ -382,7 +382,7 @@ func TestClient_GetClusters_EmptyResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(mockResponse))
+		_, _ = w.Write([]byte(mockResponse))
 	}))
 	defer server.Close()
 
@@ -453,7 +453,7 @@ users:
 		jsonResp, _ := json.Marshal(response)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write(jsonResp)
+		_, _ = w.Write(jsonResp)
 	}))
 	defer server.Close()
 
@@ -478,7 +478,7 @@ users:
 func TestClient_GetKubeconfig_Unauthorized(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(`{"message": "Unauthorized"}`))
+		_, _ = w.Write([]byte(`{"message": "Unauthorized"}`))
 	}))
 	defer server.Close()
 
@@ -499,7 +499,7 @@ func TestClient_GetKubeconfig_Unauthorized(t *testing.T) {
 func TestClient_GetKubeconfig_ClusterNotFound(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte(`{"message": "Cluster not found"}`))
+		_, _ = w.Write([]byte(`{"message": "Cluster not found"}`))
 	}))
 	defer server.Close()
 
@@ -542,7 +542,7 @@ func TestClient_GetKubeconfig_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`invalid json`))
+		_, _ = w.Write([]byte(`invalid json`))
 	}))
 	defer server.Close()
 
@@ -578,7 +578,7 @@ func TestClient_makeJSONRequest_GET(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"status": "ok"}`))
+		_, _ = w.Write([]byte(`{"status": "ok"}`))
 	}))
 	defer server.Close()
 
@@ -615,7 +615,7 @@ func TestClient_makeJSONRequest_POST_WithPayload(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"received": "ok"}`))
+		_, _ = w.Write([]byte(`{"received": "ok"}`))
 	}))
 	defer server.Close()
 
@@ -642,7 +642,7 @@ func TestClient_makeJSONRequest_WithAuthToken(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"authenticated": true}`))
+		_, _ = w.Write([]byte(`{"authenticated": true}`))
 	}))
 	defer server.Close()
 
@@ -659,7 +659,7 @@ func TestClient_makeJSONRequest_WithAuthToken(t *testing.T) {
 func TestClient_makeJSONRequest_HTTPError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error": "server error"}`))
+		_, _ = w.Write([]byte(`{"error": "server error"}`))
 	}))
 	defer server.Close()
 

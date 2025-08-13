@@ -261,6 +261,7 @@ func TestWithContext(t *testing.T) {
 	contextLogger := logger.WithContext(ctx)
 	if contextLogger == nil {
 		t.Error("Expected WithContext to return a logger")
+		return
 	}
 	
 	// Test that the returned logger works
@@ -286,6 +287,7 @@ func TestDefault(t *testing.T) {
 	defaultLogger := Default()
 	if defaultLogger == nil {
 		t.Error("Expected Default() to return a logger")
+		return
 	}
 	
 	// Test that it's the same logger we set

@@ -21,7 +21,7 @@ func init() {
 	rootCmd.AddCommand(removeCmd)
 
 	removeCmd.Flags().StringVarP(&removeURL, "url", "u", "", "Rancher server URL to remove (required)")
-	removeCmd.MarkFlagRequired("url")
+	_ = removeCmd.MarkFlagRequired("url")
 }
 
 func runRemove(cmd *cobra.Command, args []string) error {

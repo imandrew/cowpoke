@@ -61,6 +61,7 @@ func TestExecute_PersistentFlags(t *testing.T) {
 	configFlag := rootCmd.PersistentFlags().Lookup("config")
 	if configFlag == nil {
 		t.Error("Expected 'config' persistent flag to be defined")
+		return
 	}
 	
 	if configFlag.Usage == "" {
@@ -97,7 +98,7 @@ servers: []
 		viper.Reset()
 		if originalConfigFile != "" {
 			viper.SetConfigFile(originalConfigFile)
-			viper.ReadInConfig()
+			_ = viper.ReadInConfig()
 		}
 	}()
 	
@@ -116,11 +117,11 @@ servers: []
 func TestInitConfig_WithoutConfigFile(t *testing.T) {
 	// Save original HOME and restore after test
 	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
 	
 	// Create a temporary home directory
 	tempHome := t.TempDir()
-	os.Setenv("HOME", tempHome)
+	_ = os.Setenv("HOME", tempHome)
 	
 	// Save original cfgFile and restore after test
 	originalCfgFile := cfgFile
@@ -182,8 +183,8 @@ servers:
 	
 	// Save original HOME and restore after test
 	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
-	os.Setenv("HOME", tempDir)
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
+	_ = os.Setenv("HOME", tempDir)
 	
 	// Save original cfgFile and restore after test
 	originalCfgFile := cfgFile
@@ -212,8 +213,8 @@ func TestInitConfig_NoConfigFile(t *testing.T) {
 	
 	// Save original HOME and restore after test
 	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
-	os.Setenv("HOME", tempDir)
+	defer func() { _ = os.Setenv("HOME", originalHome) }()
+	_ = os.Setenv("HOME", tempDir)
 	
 	// Save original cfgFile and restore after test
 	originalCfgFile := cfgFile
@@ -246,6 +247,7 @@ func TestCobraInitialization(t *testing.T) {
 	configFlag := rootCmd.PersistentFlags().Lookup("config")
 	if configFlag == nil {
 		t.Error("Expected config flag to be set up during init")
+		return
 	}
 	
 	// Test flag properties

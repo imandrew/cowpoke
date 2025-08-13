@@ -29,8 +29,8 @@ func init() {
 	addCmd.Flags().StringVarP(&username, "username", "n", "", "Username for authentication (required)")
 	addCmd.Flags().StringVarP(&authType, "authtype", "a", "local", "Authentication type (default: local)")
 
-	addCmd.MarkFlagRequired("url")
-	addCmd.MarkFlagRequired("username")
+	_ = addCmd.MarkFlagRequired("url")
+	_ = addCmd.MarkFlagRequired("username")
 }
 
 func runAdd(cmd *cobra.Command, args []string) error {

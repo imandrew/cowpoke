@@ -74,12 +74,12 @@ func InitCommands(rootCmd *cobra.Command) {
 	addCmd.Flags().StringVarP(&url, "url", "u", "", "Rancher server URL (required)")
 	addCmd.Flags().StringVarP(&username, "username", "n", "", "Username for authentication (required)")
 	addCmd.Flags().StringVarP(&authType, "authtype", "a", "local", "Authentication type (default: local)")
-	addCmd.MarkFlagRequired("url")
-	addCmd.MarkFlagRequired("username")
+	_ = addCmd.MarkFlagRequired("url")
+	_ = addCmd.MarkFlagRequired("username")
 
 	// Initialize remove command flags
 	removeCmd.Flags().StringVarP(&removeURL, "url", "u", "", "Rancher server URL to remove (required)")
-	removeCmd.MarkFlagRequired("url")
+	_ = removeCmd.MarkFlagRequired("url")
 }
 
 // runAdd handles the add command execution

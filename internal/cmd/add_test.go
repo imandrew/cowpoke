@@ -12,9 +12,9 @@ func TestRunAdd(t *testing.T) {
 	tempDir := t.TempDir()
 	origHome := os.Getenv("HOME")
 	defer func() {
-		os.Setenv("HOME", origHome)
+		_ = os.Setenv("HOME", origHome)
 	}()
-	os.Setenv("HOME", tempDir)
+	_ = os.Setenv("HOME", tempDir)
 
 	// Create .config/cowpoke directory
 	cowpokeDir := filepath.Join(tempDir, ".config", "cowpoke")
@@ -64,9 +64,9 @@ func TestRunAdd(t *testing.T) {
 func TestRunAdd_HomeDirectoryError(t *testing.T) {
 	origHome := os.Getenv("HOME")
 	defer func() {
-		os.Setenv("HOME", origHome)
+		_ = os.Setenv("HOME", origHome)
 	}()
-	os.Unsetenv("HOME")
+	_ = os.Unsetenv("HOME")
 
 	err := runAdd(nil, nil)
 	if err == nil {
@@ -78,9 +78,9 @@ func TestRunAdd_InvalidAuthType(t *testing.T) {
 	tempDir := t.TempDir()
 	origHome := os.Getenv("HOME")
 	defer func() {
-		os.Setenv("HOME", origHome)
+		_ = os.Setenv("HOME", origHome)
 	}()
-	os.Setenv("HOME", tempDir)
+	_ = os.Setenv("HOME", tempDir)
 
 	// Create .config/cowpoke directory
 	cowpokeDir := filepath.Join(tempDir, ".config", "cowpoke")

@@ -12,9 +12,9 @@ func TestRunRemove(t *testing.T) {
 	tempDir := t.TempDir()
 	origHome := os.Getenv("HOME")
 	defer func() {
-		os.Setenv("HOME", origHome)
+		_ = os.Setenv("HOME", origHome)
 	}()
-	os.Setenv("HOME", tempDir)
+	_ = os.Setenv("HOME", tempDir)
 
 	// Create .config/cowpoke directory
 	cowpokeDir := filepath.Join(tempDir, ".config", "cowpoke")
@@ -82,9 +82,9 @@ func TestRunRemove_NotFound(t *testing.T) {
 	tempDir := t.TempDir()
 	origHome := os.Getenv("HOME")
 	defer func() {
-		os.Setenv("HOME", origHome)
+		_ = os.Setenv("HOME", origHome)
 	}()
-	os.Setenv("HOME", tempDir)
+	_ = os.Setenv("HOME", tempDir)
 
 	// Create .config/cowpoke directory
 	cowpokeDir := filepath.Join(tempDir, ".config", "cowpoke")
@@ -105,9 +105,9 @@ func TestRunRemove_NotFound(t *testing.T) {
 func TestRunRemove_HomeDirectoryError(t *testing.T) {
 	origHome := os.Getenv("HOME")
 	defer func() {
-		os.Setenv("HOME", origHome)
+		_ = os.Setenv("HOME", origHome)
 	}()
-	os.Unsetenv("HOME")
+	_ = os.Unsetenv("HOME")
 
 	err := runRemove(nil, nil)
 	if err == nil {

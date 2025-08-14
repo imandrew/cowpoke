@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"cowpoke/internal/errors"
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
+
+	"cowpoke/internal/errors"
 )
 
-// RancherServer represents a Rancher server configuration
+// RancherServer represents a Rancher server configuration.
 type RancherServer struct {
 	ID       string `yaml:"id"`
 	Name     string `yaml:"name"`
@@ -19,13 +21,13 @@ type RancherServer struct {
 	AuthType string `yaml:"authType"`
 }
 
-// Config represents the main configuration structure
+// Config represents the main configuration structure.
 type Config struct {
 	Version string          `yaml:"version"`
 	Servers []RancherServer `yaml:"servers"`
 }
 
-// Cluster represents a Kubernetes cluster managed by Rancher
+// Cluster represents a Kubernetes cluster managed by Rancher.
 type Cluster struct {
 	ID         string `yaml:"id"`
 	Name       string `yaml:"name"`
@@ -35,167 +37,51 @@ type Cluster struct {
 	ServerURL  string `yaml:"serverUrl"`
 }
 
-// AuthProvider represents an authentication provider configuration
-type AuthProvider struct {
-	ID          string `json:"id" yaml:"id"`
-	DisplayName string `json:"display_name" yaml:"display_name"`
-	Provider    string `json:"provider" yaml:"provider"`
-	Description string `json:"description,omitempty" yaml:"description,omitempty"`
+// validAuthTypes contains all supported Rancher authentication types.
+//
+//nolint:gochecknoglobals // Package-level constants for auth validation
+var validAuthTypes = []string{
+	"local",
+	"github",
+	"openldap",
+	"activedirectory",
+	"azuread",
+	"okta",
+	"ping",
+	"keycloak",
+	"shibboleth",
+	"googleoauth",
 }
 
-func (a AuthProvider) String() string {
-	return a.ID
-}
-
-func (a AuthProvider) URLPath() string {
-	return a.Provider
-}
-
-// AuthRegistry manages authentication providers
-type AuthRegistry struct {
-	providers map[string]AuthProvider
-	order     []string
-}
-
-// NewAuthRegistry creates a new authentication registry
-func NewAuthRegistry() *AuthRegistry {
-	return &AuthRegistry{
-		providers: make(map[string]AuthProvider),
-		order:     make([]string, 0),
-	}
-}
-
-// Register adds or updates an authentication provider
-func (r *AuthRegistry) Register(provider AuthProvider) {
-	if _, exists := r.providers[provider.ID]; !exists {
-		r.order = append(r.order, provider.ID)
-	}
-	r.providers[provider.ID] = provider
-}
-
-// Get retrieves an authentication provider by ID
-func (r *AuthRegistry) Get(id string) (AuthProvider, bool) {
-	provider, exists := r.providers[id]
-	return provider, exists
-}
-
-// All returns all registered authentication providers in order
-func (r *AuthRegistry) All() []AuthProvider {
-	result := make([]AuthProvider, 0, len(r.order))
-	for _, id := range r.order {
-		result = append(result, r.providers[id])
-	}
-	return result
-}
-
-// IsValid checks if an authentication provider ID is registered
-func (r *AuthRegistry) IsValid(id string) bool {
-	_, exists := r.providers[id]
-	return exists
-}
-
-// IDs returns all registered provider IDs in order
-func (r *AuthRegistry) IDs() []string {
-	return append([]string(nil), r.order...)
-}
-
-// String returns a string representation of all provider IDs
-func (r *AuthRegistry) String() string {
-	ids := r.IDs()
-	return fmt.Sprintf("%v", ids)
-}
-
-// SupportedAuthTypes is the global registry of supported authentication types
-var SupportedAuthTypes = NewAuthRegistry()
-
-func init() {
-	// Register all supported Rancher authentication providers
-	SupportedAuthTypes.Register(AuthProvider{
-		ID:          "local",
-		DisplayName: "Local Authentication",
-		Provider:    "local",
-		Description: "Rancher local user authentication",
-	})
-	SupportedAuthTypes.Register(AuthProvider{
-		ID:          "github",
-		DisplayName: "GitHub",
-		Provider:    "github",
-		Description: "GitHub OAuth authentication",
-	})
-	SupportedAuthTypes.Register(AuthProvider{
-		ID:          "openldap",
-		DisplayName: "OpenLDAP",
-		Provider:    "openldap",
-		Description: "OpenLDAP authentication",
-	})
-	SupportedAuthTypes.Register(AuthProvider{
-		ID:          "activedirectory",
-		DisplayName: "Active Directory",
-		Provider:    "activedirectory",
-		Description: "Microsoft Active Directory authentication",
-	})
-	SupportedAuthTypes.Register(AuthProvider{
-		ID:          "azuread",
-		DisplayName: "Azure AD",
-		Provider:    "azuread",
-		Description: "Azure Active Directory authentication",
-	})
-	SupportedAuthTypes.Register(AuthProvider{
-		ID:          "okta",
-		DisplayName: "Okta",
-		Provider:    "okta",
-		Description: "Okta SAML authentication",
-	})
-	SupportedAuthTypes.Register(AuthProvider{
-		ID:          "ping",
-		DisplayName: "PingIdentity",
-		Provider:    "ping",
-		Description: "PingIdentity SAML authentication",
-	})
-	SupportedAuthTypes.Register(AuthProvider{
-		ID:          "keycloak",
-		DisplayName: "Keycloak",
-		Provider:    "keycloak",
-		Description: "Keycloak OIDC/SAML authentication",
-	})
-	SupportedAuthTypes.Register(AuthProvider{
-		ID:          "shibboleth",
-		DisplayName: "Shibboleth",
-		Provider:    "shibboleth",
-		Description: "Shibboleth SAML authentication",
-	})
-	SupportedAuthTypes.Register(AuthProvider{
-		ID:          "googleoauth",
-		DisplayName: "Google OAuth",
-		Provider:    "googleoauth",
-		Description: "Google OAuth authentication",
-	})
-}
-
-// IsValidAuthType checks if the provided auth type is supported
+// IsValidAuthType checks if the provided auth type is supported.
 func IsValidAuthType(authType string) bool {
-	return SupportedAuthTypes.IsValid(authType)
+	for _, valid := range validAuthTypes {
+		if valid == authType {
+			return true
+		}
+	}
+	return false
 }
 
-// GetSupportedAuthTypesString returns a formatted string of all supported auth types
+// GetSupportedAuthTypesString returns a formatted string of all supported auth types.
 func GetSupportedAuthTypesString() string {
-	return SupportedAuthTypes.String()
+	return strings.Join(validAuthTypes, ", ")
 }
 
-// ConfigManager handles configuration file operations
-type ConfigManager struct {
+// Manager handles configuration file operations.
+type Manager struct {
 	configPath string
 }
 
-// NewConfigManager creates a new configuration manager
-func NewConfigManager(configPath string) *ConfigManager {
-	return &ConfigManager{
+// NewConfigManager creates a new configuration manager.
+func NewConfigManager(configPath string) *Manager {
+	return &Manager{
 		configPath: configPath,
 	}
 }
 
-// LoadConfig loads the configuration from the file system
-func (cm *ConfigManager) LoadConfig() (*Config, error) {
+// LoadConfig loads the configuration from the file system.
+func (cm *Manager) LoadConfig() (*Config, error) {
 	if _, err := os.Stat(cm.configPath); os.IsNotExist(err) {
 		return &Config{
 			Version: "1.0",
@@ -224,10 +110,15 @@ func (cm *ConfigManager) LoadConfig() (*Config, error) {
 	return &config, nil
 }
 
-// SaveConfig saves the configuration to the file system
-func (cm *ConfigManager) SaveConfig(config *Config) error {
-	if err := os.MkdirAll(filepath.Dir(cm.configPath), 0755); err != nil {
-		return errors.NewConfigurationError("config_directory", filepath.Dir(cm.configPath), "failed to create config directory", err)
+// SaveConfig saves the configuration to the file system.
+func (cm *Manager) SaveConfig(config *Config) error {
+	if err := os.MkdirAll(filepath.Dir(cm.configPath), 0o750); err != nil {
+		return errors.NewConfigurationError(
+			"config_directory",
+			filepath.Dir(cm.configPath),
+			"failed to create config directory",
+			err,
+		)
 	}
 
 	data, err := yaml.Marshal(config)
@@ -235,7 +126,7 @@ func (cm *ConfigManager) SaveConfig(config *Config) error {
 		return errors.NewConfigurationError("config_format", "yaml", "failed to marshal config", err)
 	}
 
-	err = os.WriteFile(cm.configPath, data, 0644)
+	err = os.WriteFile(cm.configPath, data, 0o600)
 	if err != nil {
 		return errors.NewConfigurationError("config_path", cm.configPath, "failed to write config file", err)
 	}
@@ -243,10 +134,15 @@ func (cm *ConfigManager) SaveConfig(config *Config) error {
 	return nil
 }
 
-// AddServer adds a new Rancher server to the configuration
-func (cm *ConfigManager) AddServer(server RancherServer) error {
+// AddServer adds a new Rancher server to the configuration.
+func (cm *Manager) AddServer(server RancherServer) error {
 	if !IsValidAuthType(server.AuthType) {
-		return errors.NewValidationError("auth_type", server.AuthType, "supported_values", fmt.Sprintf("auth type must be one of: %s", GetSupportedAuthTypesString()))
+		return errors.NewValidationError(
+			"auth_type",
+			server.AuthType,
+			"supported_values",
+			fmt.Sprintf("auth type must be one of: %s", GetSupportedAuthTypesString()),
+		)
 	}
 
 	config, err := cm.LoadConfig()
@@ -263,8 +159,8 @@ func (cm *ConfigManager) AddServer(server RancherServer) error {
 	return cm.SaveConfig(config)
 }
 
-// RemoveServer removes a Rancher server by ID from the configuration
-func (cm *ConfigManager) RemoveServer(serverID string) error {
+// RemoveServer removes a Rancher server by ID from the configuration.
+func (cm *Manager) RemoveServer(serverID string) error {
 	config, err := cm.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -289,8 +185,8 @@ func (cm *ConfigManager) RemoveServer(serverID string) error {
 	return cm.SaveConfig(config)
 }
 
-// RemoveServerByURL removes a Rancher server by URL from the configuration
-func (cm *ConfigManager) RemoveServerByURL(url string) error {
+// RemoveServerByURL removes a Rancher server by URL from the configuration.
+func (cm *Manager) RemoveServerByURL(url string) error {
 	config, err := cm.LoadConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
@@ -315,8 +211,8 @@ func (cm *ConfigManager) RemoveServerByURL(url string) error {
 	return cm.SaveConfig(config)
 }
 
-// GetServers returns all configured Rancher servers
-func (cm *ConfigManager) GetServers() ([]RancherServer, error) {
+// GetServers returns all configured Rancher servers.
+func (cm *Manager) GetServers() ([]RancherServer, error) {
 	config, err := cm.LoadConfig()
 	if err != nil {
 		return nil, err

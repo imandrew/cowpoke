@@ -5,8 +5,10 @@ import (
 	"os"
 )
 
+//nolint:gochecknoglobals // Package-level logger instance for consistent logging
 var logger *slog.Logger
 
+//nolint:gochecknoinits // Package-level logger initialization
 func init() {
 	// Default to info level, text output to stderr
 	logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
@@ -14,12 +16,12 @@ func init() {
 	}))
 }
 
-// Get returns the global logger
+// Get returns the global logger.
 func Get() *slog.Logger {
 	return logger
 }
 
-// SetVerbose enables or disables verbose (debug) logging
+// SetVerbose enables or disables verbose (debug) logging.
 func SetVerbose(verbose bool) {
 	level := slog.LevelInfo
 	if verbose {
@@ -31,7 +33,7 @@ func SetVerbose(verbose bool) {
 	}))
 }
 
-// Default returns the global logger (backwards compatibility during migration)
+// Default returns the global logger (backwards compatibility during migration).
 func Default() *slog.Logger {
 	return logger
 }

@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -21,8 +21,11 @@ jobs:
     - name: Install dependencies
       run: go mod download
       
-    - name: Format code
-      run: go fmt ./...
+    - name: Install gofumpt
+      run: go install mvdan.cc/gofumpt@latest
+      
+    - name: Check code formatting
+      run: make fmt-check
       
     - name: Run tests
       run: go test -v -race -coverprofile=coverage.out ./...
@@ -36,7 +39,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -44,6 +47,6 @@ jobs:
         go-version-file: go.mod
         
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@v6
+      uses: golangci/golangci-lint-action@v8
       with:
         version: latest

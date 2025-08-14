@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+//nolint:gochecknoglobals // Cobra CLI pattern for subcommand
 var removeCmd = &cobra.Command{
 	Use:   "remove",
 	Short: "Remove a Rancher server from the configuration",
@@ -15,16 +16,17 @@ var removeCmd = &cobra.Command{
 	RunE:  runRemove,
 }
 
-var removeURL string
-
+//nolint:gochecknoinits // Cobra CLI pattern for command registration
 func init() {
 	rootCmd.AddCommand(removeCmd)
 
-	removeCmd.Flags().StringVarP(&removeURL, "url", "u", "", "Rancher server URL to remove (required)")
+	removeCmd.Flags().StringP("url", "u", "", "Rancher server URL to remove (required)")
 	_ = removeCmd.MarkFlagRequired("url")
 }
 
-func runRemove(cmd *cobra.Command, args []string) error {
+func runRemove(cmd *cobra.Command, _ []string) error {
+	removeURL, _ := cmd.Flags().GetString("url")
+
 	configManager, err := utils.GetConfigManager()
 	if err != nil {
 		return err
@@ -35,6 +37,6 @@ func runRemove(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to remove server: %w", err)
 	}
 
-	fmt.Printf("Successfully removed Rancher server: %s\n", removeURL)
+	fmt.Fprintf(cmd.OutOrStdout(), "Successfully removed Rancher server: %s\n", removeURL)
 	return nil
 }

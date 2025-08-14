@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -48,7 +49,6 @@ func TestSyncProcessor_ProcessServers_EmptyList(t *testing.T) {
 	servers := []config.RancherServer{}
 
 	paths, err := processor.ProcessServers(ctx, servers)
-
 	if err != nil {
 		t.Fatalf("Expected no error for empty server list, got: %v", err)
 	}
@@ -100,7 +100,7 @@ func TestSyncProcessor_ProcessServers_SemaphoreLimit(t *testing.T) {
 
 	// Create more servers than the semaphore limit (3)
 	servers := make([]config.RancherServer, 5)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		servers[i] = config.RancherServer{
 			ID:       "server-" + string(rune('1'+i)),
 			Name:     "Test Server " + string(rune('1'+i)),
@@ -114,7 +114,6 @@ func TestSyncProcessor_ProcessServers_SemaphoreLimit(t *testing.T) {
 	// Note: This will fail during authentication since we're using dummy servers,
 	// but the semaphore logic should still work correctly
 	paths, err := processor.ProcessServers(ctx, servers)
-
 	// We expect this to complete (not hang) and return empty paths
 	// since authentication will fail for all dummy servers
 	if err != nil {
@@ -193,7 +192,6 @@ func TestSyncProcessor_processSingleServer_ContextTimeout(t *testing.T) {
 
 	// Should return nil (no error) since errors are handled gracefully
 	err := processor.processSingleServer(ctx, server, "test-password", &kubeconfigPaths, &pathsMutex)
-
 	if err != nil {
 		t.Errorf("Expected nil error (graceful handling), got: %v", err)
 	}
@@ -223,7 +221,6 @@ func TestSyncProcessor_processSingleServer_InvalidServer(t *testing.T) {
 	var pathsMutex sync.Mutex
 
 	err := processor.processSingleServer(ctx, server, "test-password", &kubeconfigPaths, &pathsMutex)
-
 	// Should return nil (graceful error handling)
 	if err != nil {
 		t.Errorf("Expected nil error (graceful handling), got: %v", err)
@@ -251,26 +248,35 @@ func TestSyncProcessor_processSingleServer_ThreadSafety(t *testing.T) {
 
 	var kubeconfigPaths []string
 	var pathsMutex sync.Mutex
+	var callCount int32 // atomic counter for verifying concurrent execution
 
 	// Run multiple goroutines to test thread safety
 	var wg sync.WaitGroup
 	numGoroutines := 5
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			atomic.AddInt32(&callCount, 1)
 			_ = processor.processSingleServer(ctx, server, "test-password", &kubeconfigPaths, &pathsMutex)
 		}()
 	}
 
 	wg.Wait()
 
-	// Should complete without data races
+	// Verify all goroutines executed
+	if atomic.LoadInt32(&callCount) != int32(numGoroutines) {
+		t.Errorf("Expected %d concurrent calls, got %d", numGoroutines, callCount)
+	}
+
 	// All calls should fail gracefully, so paths should be empty
 	if len(kubeconfigPaths) != 0 {
 		t.Errorf("Expected 0 paths due to authentication failures, got %d", len(kubeconfigPaths))
 	}
+
+	// This test primarily validates that concurrent calls don't cause panics or data races
+	// when run with -race flag
 }
 
 func TestSyncProcessor_processClusters_EmptyList(t *testing.T) {
@@ -284,11 +290,16 @@ func TestSyncProcessor_processClusters_EmptyList(t *testing.T) {
 	var kubeconfigPaths []string
 	var pathsMutex sync.Mutex
 
-	err := processor.processClusters(ctx, clusters, "server-1", "https://test.example.com", nil, &kubeconfigPaths, &pathsMutex, logger)
-
-	if err != nil {
-		t.Errorf("Expected no error for empty cluster list, got: %v", err)
-	}
+	processor.processClusters(
+		ctx,
+		clusters,
+		"server-1",
+		"https://test.example.com",
+		nil,
+		&kubeconfigPaths,
+		&pathsMutex,
+		logger,
+	)
 
 	if len(kubeconfigPaths) != 0 {
 		t.Errorf("Expected 0 paths for empty cluster list, got %d", len(kubeconfigPaths))
@@ -324,11 +335,21 @@ func TestSyncProcessor_processClusters_ContextCancellation(t *testing.T) {
 	}
 	client := rancher.NewClient(server)
 
-	err := processor.processClusters(ctx, clusters, "server-1", "https://test.example.com", client, &kubeconfigPaths, &pathsMutex, logger)
+	processor.processClusters(
+		ctx,
+		clusters,
+		"server-1",
+		"https://test.example.com",
+		client,
+		&kubeconfigPaths,
+		&pathsMutex,
+		logger,
+	)
 
-	// Should return nil (graceful error handling)
-	if err != nil {
-		t.Errorf("Expected nil error (graceful handling), got: %v", err)
+	// Verify that the function handled the cancelled context gracefully
+	// The function should complete without panicking, even with a cancelled context
+	if len(kubeconfigPaths) != 0 {
+		t.Errorf("Expected 0 paths with cancelled context, got %d", len(kubeconfigPaths))
 	}
 }
 
@@ -373,16 +394,29 @@ func TestSyncProcessor_processClusters_ConcurrentProcessing(t *testing.T) {
 	client := rancher.NewClient(server)
 
 	start := time.Now()
-	err := processor.processClusters(ctx, clusters, "server-1", "https://test.example.com", client, &kubeconfigPaths, &pathsMutex, logger)
+	processor.processClusters(
+		ctx,
+		clusters,
+		"server-1",
+		"https://test.example.com",
+		client,
+		&kubeconfigPaths,
+		&pathsMutex,
+		logger,
+	)
 	duration := time.Since(start)
 
-	// Should complete relatively quickly due to concurrent processing
+	// With maxConcurrentClusters = 2 in sync_processor.go, we should process
+	// 2 clusters in parallel, then 1 more. This should be faster than sequential.
+	// Note: actual timing depends on network/auth failures, so we keep a generous limit
 	if duration > 5*time.Second {
-		t.Errorf("Expected concurrent processing to complete faster, took %v", duration)
+		t.Errorf("Expected concurrent processing to complete within 5s, took %v", duration)
 	}
 
-	if err != nil {
-		t.Errorf("Expected nil error (graceful handling), got: %v", err)
+	// Verify the function processed all clusters (even if they all failed)
+	// We can't check exact results without mocking, but the function should complete
+	if len(kubeconfigPaths) != 0 {
+		t.Errorf("Expected 0 paths due to auth failures, got %d", len(kubeconfigPaths))
 	}
 }
 
@@ -411,8 +445,16 @@ func TestSyncProcessor_processCluster_InvalidCluster(t *testing.T) {
 	}
 	client := rancher.NewClient(server)
 
-	err := processor.processCluster(ctx, cluster, "server-1", "https://test.example.com", client, &kubeconfigPaths, &pathsMutex, logger)
-
+	err := processor.processCluster(
+		ctx,
+		cluster,
+		"server-1",
+		"https://test.example.com",
+		client,
+		&kubeconfigPaths,
+		&pathsMutex,
+		logger,
+	)
 	// Should return nil (graceful error handling)
 	if err != nil {
 		t.Errorf("Expected nil error (graceful handling), got: %v", err)
@@ -450,8 +492,16 @@ func TestSyncProcessor_processCluster_ContextTimeout(t *testing.T) {
 	}
 	client := rancher.NewClient(server)
 
-	err := processor.processCluster(ctx, cluster, "server-1", "https://test.example.com", client, &kubeconfigPaths, &pathsMutex, logger)
-
+	err := processor.processCluster(
+		ctx,
+		cluster,
+		"server-1",
+		"https://test.example.com",
+		client,
+		&kubeconfigPaths,
+		&pathsMutex,
+		logger,
+	)
 	// Should return nil (graceful error handling)
 	if err != nil {
 		t.Errorf("Expected nil error (graceful handling), got: %v", err)
@@ -478,6 +528,7 @@ func TestSyncProcessor_processCluster_ThreadSafety(t *testing.T) {
 
 	var kubeconfigPaths []string
 	var pathsMutex sync.Mutex
+	var processCount int32 // atomic counter to verify concurrent execution
 
 	// Create a dummy server for the client (will fail but won't panic)
 	server := config.RancherServer{
@@ -491,24 +542,43 @@ func TestSyncProcessor_processCluster_ThreadSafety(t *testing.T) {
 	var wg sync.WaitGroup
 	numGoroutines := 10
 
-	for i := 0; i < numGoroutines; i++ {
+	for range numGoroutines {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_ = processor.processCluster(ctx, cluster, "server-1", "https://test.example.com", client, &kubeconfigPaths, &pathsMutex, logger)
+			atomic.AddInt32(&processCount, 1)
+			_ = processor.processCluster(
+				ctx,
+				cluster,
+				"server-1",
+				"https://test.example.com",
+				client,
+				&kubeconfigPaths,
+				&pathsMutex,
+				logger,
+			)
+			// Verify that mutex is properly protecting the shared slice
+			// The mutex is used internally, so we just ensure no data corruption
 		}()
 	}
 
 	wg.Wait()
 
-	// Should complete without data races
-	// All calls should fail gracefully, so paths should be empty
-	if len(kubeconfigPaths) != 0 {
-		t.Errorf("Expected 0 paths due to failures, got %d", len(kubeconfigPaths))
+	// Verify all goroutines executed
+	if atomic.LoadInt32(&processCount) != int32(numGoroutines) {
+		t.Errorf("Expected %d concurrent executions, got %d", numGoroutines, processCount)
 	}
+
+	// All calls should fail gracefully (auth failure), so paths should be empty
+	if len(kubeconfigPaths) != 0 {
+		t.Errorf("Expected 0 paths due to authentication failures, got %d", len(kubeconfigPaths))
+	}
+
+	// This test validates concurrent access doesn't cause panics or data races
+	// Run with -race flag to detect any race conditions
 }
 
-// Integration test to verify the overall flow
+// Integration test to verify the overall flow.
 func TestSyncProcessor_Integration(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
 	logger := logging.Get()
@@ -535,7 +605,6 @@ func TestSyncProcessor_Integration(t *testing.T) {
 
 	// This tests the full integration flow
 	paths, err := processor.ProcessServers(ctx, servers)
-
 	// Should complete without hanging and handle errors gracefully
 	if err != nil {
 		t.Fatalf("Expected graceful error handling, got: %v", err)
@@ -546,7 +615,7 @@ func TestSyncProcessor_Integration(t *testing.T) {
 	}
 }
 
-// Test error handling patterns
+// Test error handling patterns.
 func TestSyncProcessor_ErrorHandling(t *testing.T) {
 	kubeconfigManager := kubeconfig.NewManager("/test/path")
 	logger := logging.Get()
@@ -566,7 +635,6 @@ func TestSyncProcessor_ErrorHandling(t *testing.T) {
 	}
 
 	paths, err := processor.ProcessServers(ctx, servers)
-
 	// Should handle errors gracefully and not return an error
 	if err != nil {
 		t.Errorf("Expected graceful error handling, got: %v", err)
@@ -597,14 +665,11 @@ func TestRunSync_NoServersConfigured(t *testing.T) {
 	}
 
 	// Set environment to use our test config
-	originalHome := os.Getenv("HOME")
-	defer func() { _ = os.Setenv("HOME", originalHome) }()
-	_ = os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Create and run the command
 	cmd := &cobra.Command{}
 	err = runSync(cmd, []string{})
-
 	// Should complete successfully with no servers message
 	if err != nil {
 		t.Errorf("Expected no error for empty server list, got: %v", err)
@@ -613,11 +678,7 @@ func TestRunSync_NoServersConfigured(t *testing.T) {
 
 func TestRunSync_ConfigManagerError(t *testing.T) {
 	// Set an invalid home directory that will cause utils.GetConfigManager to fail
-	originalHome := os.Getenv("HOME")
-	defer func() { _ = os.Setenv("HOME", originalHome) }()
-
-	// Set HOME to empty string which will cause the config path resolution to fail
-	_ = os.Setenv("HOME", "")
+	t.Setenv("HOME", "")
 
 	cmd := &cobra.Command{}
 	err := runSync(cmd, []string{})
@@ -633,19 +694,17 @@ func TestRunSync_LoadServersError(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Set environment to use our test directory but don't create config
-	originalHome := os.Getenv("HOME")
-	defer func() { _ = os.Setenv("HOME", originalHome) }()
-	_ = os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Create invalid config file that will cause parsing error
 	configPath := filepath.Join(tempDir, ".config", "cowpoke", "config.yaml")
-	err := os.MkdirAll(filepath.Dir(configPath), 0755)
+	err := os.MkdirAll(filepath.Dir(configPath), 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create config directory: %v", err)
 	}
 
 	// Write invalid YAML
-	err = os.WriteFile(configPath, []byte("invalid: yaml: content: ["), 0644)
+	err = os.WriteFile(configPath, []byte("invalid: yaml: content: ["), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write invalid config: %v", err)
 	}
@@ -665,9 +724,7 @@ func TestRunSync_LoadServersError(t *testing.T) {
 
 func TestRunSync_GetKubeconfigDirError(t *testing.T) {
 	// Save original HOME and clear it to cause GetKubeconfigDir to fail
-	originalHome := os.Getenv("HOME")
-	defer func() { _ = os.Setenv("HOME", originalHome) }()
-	_ = os.Unsetenv("HOME")
+	t.Setenv("HOME", "")
 
 	cmd := &cobra.Command{}
 	err := runSync(cmd, []string{})
@@ -688,7 +745,7 @@ func TestRunSync_ProcessServersError(t *testing.T) {
 
 	// Create config in standard location
 	configDir := filepath.Join(tempDir, ".config", "cowpoke")
-	err := os.MkdirAll(configDir, 0755)
+	err := os.MkdirAll(configDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create config directory: %v", err)
 	}
@@ -714,16 +771,13 @@ func TestRunSync_ProcessServersError(t *testing.T) {
 	}
 
 	// Set environment to use our test config
-	originalHome := os.Getenv("HOME")
-	defer func() { _ = os.Setenv("HOME", originalHome) }()
-	_ = os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// This will fail during ProcessServers due to network issues
 	// but since our implementation handles errors gracefully,
 	// it should not return an error but will have no kubeconfigs
 	cmd := &cobra.Command{}
 	err = runSync(cmd, []string{})
-
 	// Should complete successfully but with no kubeconfigs downloaded message
 	if err != nil {
 		t.Errorf("Expected no error (graceful handling), got: %v", err)
@@ -756,13 +810,10 @@ func TestRunSync_NoKubeconfigsDownloaded(t *testing.T) {
 	}
 
 	// Set environment to use our test config
-	originalHome := os.Getenv("HOME")
-	defer func() { _ = os.Setenv("HOME", originalHome) }()
-	_ = os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	cmd := &cobra.Command{}
 	err = runSync(cmd, []string{})
-
 	// Should complete successfully but print warning about no kubeconfigs
 	if err != nil {
 		t.Errorf("Expected no error (graceful handling), got: %v", err)
@@ -807,7 +858,7 @@ func TestRunSync_Success(t *testing.T) {
 	t.Skip("Requires mock HTTP servers to test successful sync end-to-end")
 }
 
-// Test the sync command initialization
+// Test the sync command initialization.
 func TestSyncCmdInitialization(t *testing.T) {
 	// Verify the sync command is properly configured
 	if syncCmd.Use != "sync" {
@@ -866,13 +917,14 @@ func TestSyncProcessor_ProcessServers_ErrorReturned(t *testing.T) {
 		t.Error("Expected nil kubeconfig paths when error occurs")
 	}
 
-	if err != nil && !strings.Contains(err.Error(), "failed to collect passwords") && !strings.Contains(err.Error(), "sync failed") {
+	if err != nil && !strings.Contains(err.Error(), "failed to collect passwords") &&
+		!strings.Contains(err.Error(), "sync failed") {
 		t.Errorf("Expected error to contain 'sync failed' or 'failed to collect passwords', got: %v", err)
 	}
 }
 
-func TestSyncProcessor_processSingleServer_SuccessfulAuthentication(t *testing.T) {
-	// Test the success path after authentication in processSingleServer
+func TestSyncProcessor_processSingleServer_GracefulErrorHandling(t *testing.T) {
+	// Test that processSingleServer handles errors gracefully without propagating them
 	tempDir := t.TempDir()
 	manager := kubeconfig.NewManager(tempDir)
 
@@ -892,10 +944,9 @@ func TestSyncProcessor_processSingleServer_SuccessfulAuthentication(t *testing.T
 	var kubeconfigPaths []string
 	var pathsMutex sync.Mutex
 
-	// This will test the authentication failure path since we can't easily mock a successful auth
-	// But it exercises the error handling and logging code paths
+	// This tests the graceful error handling - authentication will fail but the function
+	// should return nil (not an error) to allow processing to continue with other servers
 	err := processor.processSingleServer(ctx, server, "test-password", &kubeconfigPaths, &pathsMutex)
-
 	// Should return nil (not an error) since errors are handled gracefully
 	if err != nil {
 		t.Errorf("Expected processSingleServer to handle errors gracefully, got: %v", err)
@@ -908,7 +959,7 @@ func TestSyncProcessor_processCluster_SaveKubeconfigError(t *testing.T) {
 
 	// Create a read-only directory to cause SaveKubeconfig to fail
 	readOnlyDir := filepath.Join(tempDir, "readonly")
-	err := os.MkdirAll(readOnlyDir, 0444) // Read-only permissions
+	err := os.MkdirAll(readOnlyDir, 0o444) // Read-only permissions
 	if err != nil {
 		t.Fatalf("Failed to create read-only directory: %v", err)
 	}
@@ -938,8 +989,16 @@ func TestSyncProcessor_processCluster_SaveKubeconfigError(t *testing.T) {
 
 	// This will test the GetKubeconfig failure path since we can't authenticate
 	// But it exercises the error handling code paths
-	err = processor.processCluster(ctx, cluster, "test-server", "https://test.example.com", client, &kubeconfigPaths, &pathsMutex, serverLogger)
-
+	err = processor.processCluster(
+		ctx,
+		cluster,
+		"test-server",
+		"https://test.example.com",
+		client,
+		&kubeconfigPaths,
+		&pathsMutex,
+		serverLogger,
+	)
 	// Should return nil (not an error) since errors are handled gracefully
 	if err != nil {
 		t.Errorf("Expected processCluster to handle errors gracefully, got: %v", err)

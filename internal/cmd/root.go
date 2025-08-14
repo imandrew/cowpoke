@@ -8,24 +8,39 @@ import (
 	"github.com/spf13/viper"
 )
 
+//nolint:gochecknoglobals // Cobra CLI pattern for persistent flag variable
 var cfgFile string
 
-// Build information
-var (
-	version = "dev"
-	commit  = "none"
-	date    = "unknown"
-	builtBy = "unknown"
-)
-
-// SetVersionInfo updates the build information variables
-func SetVersionInfo(v, c, d, b string) {
-	version = v
-	commit = c
-	date = d
-	builtBy = b
+// VersionInfo holds build information.
+type VersionInfo struct {
+	Version string
+	Commit  string
+	Date    string
+	BuiltBy string
 }
 
+//nolint:gochecknoglobals // Package-level version info for CLI commands
+var versionInfo = VersionInfo{
+	Version: "dev",
+	Commit:  "none",
+	Date:    "unknown",
+	BuiltBy: "unknown",
+}
+
+// SetVersionInfo updates the build information.
+func SetVersionInfo(v, c, d, b string) {
+	versionInfo.Version = v
+	versionInfo.Commit = c
+	versionInfo.Date = d
+	versionInfo.BuiltBy = b
+}
+
+// GetVersionInfo returns the current version information.
+func GetVersionInfo() VersionInfo {
+	return versionInfo
+}
+
+//nolint:gochecknoglobals // Cobra CLI pattern for root command
 var rootCmd = &cobra.Command{
 	Use:   "cowpoke",
 	Short: "A CLI tool for managing Rancher servers and downloading kubeconfigs",
@@ -40,10 +55,12 @@ func Execute() {
 	}
 }
 
+//nolint:gochecknoinits // Cobra CLI pattern for flag initialization
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/cowpoke/config.yaml)")
+	rootCmd.PersistentFlags().
+		StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/cowpoke/config.yaml)")
 }
 
 func initConfig() {

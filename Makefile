@@ -33,9 +33,13 @@ goreleaser-build:
 goreleaser-check:
 	goreleaser check
 
-# Format code
+# Format code with gofumpt
 fmt:
-	go fmt ./...
+	gofumpt -l -w .
+
+# Check formatting without making changes
+fmt-check:
+	gofumpt -l .
 
 # Show help
 help:
@@ -48,5 +52,6 @@ help:
 	@echo "  install          - Install/update dependencies"
 	@echo "  goreleaser-build - Build with goreleaser (snapshot)"
 	@echo "  goreleaser-check - Check goreleaser configuration"
-	@echo "  fmt              - Format code"
+	@echo "  fmt              - Format code with gofumpt"
+	@echo "  fmt-check        - Check code formatting (CI friendly)"
 	@echo "  help             - Show this help message"

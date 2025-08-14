@@ -92,7 +92,12 @@ func TestConfigurationError(t *testing.T) {
 }
 
 func TestValidationError(t *testing.T) {
-	err := NewValidationError("auth_type", "invalid", "supported_values", "auth type must be one of: local, github, openldap")
+	err := NewValidationError(
+		"auth_type",
+		"invalid",
+		"supported_values",
+		"auth type must be one of: local, github, openldap",
+	)
 
 	expectedMsg := "validation error in field 'auth_type': auth type must be one of: local, github, openldap"
 	if err.Error() != expectedMsg {
@@ -170,7 +175,7 @@ func TestJoin(t *testing.T) {
 
 	// Test joining single error
 	single := Join(err1)
-	if single != err1 {
+	if !errors.Is(single, err1) {
 		t.Error("Expected single error to be returned as-is")
 	}
 
@@ -270,7 +275,7 @@ func TestErrorChaining(t *testing.T) {
 		t.Error("Expected to extract HTTPError from wrapped error")
 	}
 
-	if extractedHTTPErr.StatusCode != 500 {
+	if extractedHTTPErr.StatusCode != http.StatusInternalServerError {
 		t.Errorf("Expected status code 500, got %d", extractedHTTPErr.StatusCode)
 	}
 }
@@ -293,7 +298,7 @@ func TestConfigurationError_Unwrap(t *testing.T) {
 	err := NewConfigurationError("field", "value", "message", cause)
 
 	unwrapped := err.Unwrap()
-	if unwrapped != cause {
+	if !errors.Is(unwrapped, cause) {
 		t.Errorf("Expected unwrapped error to be %v, got %v", cause, unwrapped)
 	}
 }

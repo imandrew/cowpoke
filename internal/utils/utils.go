@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -15,12 +16,21 @@ import (
 
 // Input/Terminal utilities
 
-// PromptForPassword prompts the user for a password without echoing it to the terminal
+// PromptForPassword prompts the user for a password without echoing it to the terminal.
 func PromptForPassword(prompt string) (string, error) {
-	fmt.Print(prompt)
+	return PromptForPasswordWriter(os.Stdout, prompt)
+}
+
+// PromptForPasswordWriter prompts for a password using the specified writer for output.
+// This allows for better testing and flexibility.
+func PromptForPasswordWriter(w io.Writer, prompt string) (string, error) {
+	_, err := io.WriteString(w, prompt)
+	if err != nil {
+		return "", fmt.Errorf("failed to write prompt: %w", err)
+	}
 
 	// Get the file descriptor for stdin
-	fd := int(syscall.Stdin)
+	fd := syscall.Stdin
 
 	// Read password without echo
 	password, err := term.ReadPassword(fd)
@@ -29,24 +39,27 @@ func PromptForPassword(prompt string) (string, error) {
 	}
 
 	// Print a newline since ReadPassword doesn't
-	fmt.Println()
+	_, err = io.WriteString(w, "\n")
+	if err != nil {
+		return "", fmt.Errorf("failed to write newline: %w", err)
+	}
 
 	return string(password), nil
 }
 
-// IsTerminal checks if the given file descriptor is a terminal
+// IsTerminal checks if the given file descriptor is a terminal.
 func IsTerminal(fd int) bool {
 	return term.IsTerminal(fd)
 }
 
-// CanPromptForPassword checks if we can prompt for password (i.e., running in a terminal)
+// CanPromptForPassword checks if we can prompt for password (i.e., running in a terminal).
 func CanPromptForPassword() bool {
 	return IsTerminal(int(os.Stdin.Fd()))
 }
 
 // Path utilities
 
-// GetConfigPath returns the path to the configuration file
+// GetConfigPath returns the path to the configuration file.
 func GetConfigPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -55,7 +68,7 @@ func GetConfigPath() (string, error) {
 	return filepath.Join(homeDir, ".config", "cowpoke", "config.yaml"), nil
 }
 
-// GetKubeconfigDir returns the path to the kubeconfig directory
+// GetKubeconfigDir returns the path to the kubeconfig directory.
 func GetKubeconfigDir() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -64,8 +77,8 @@ func GetKubeconfigDir() (string, error) {
 	return filepath.Join(homeDir, ".config", "cowpoke", "kubeconfigs"), nil
 }
 
-// GetConfigManager creates a new ConfigManager with the standard config path
-func GetConfigManager() (*config.ConfigManager, error) {
+// GetConfigManager creates a new ConfigManager with the standard config path.
+func GetConfigManager() (*config.Manager, error) {
 	configPath, err := GetConfigPath()
 	if err != nil {
 		return nil, err
@@ -73,7 +86,7 @@ func GetConfigManager() (*config.ConfigManager, error) {
 	return config.NewConfigManager(configPath), nil
 }
 
-// GetDefaultKubeconfigPath returns the path to the default kubectl config file
+// GetDefaultKubeconfigPath returns the path to the default kubectl config file.
 func GetDefaultKubeconfigPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -84,7 +97,7 @@ func GetDefaultKubeconfigPath() (string, error) {
 
 // Filename/URL sanitization utilities
 
-// SanitizeFilename removes or replaces invalid characters from filenames
+// SanitizeFilename removes or replaces invalid characters from filenames.
 func SanitizeFilename(filename string) string {
 	// Replace invalid characters with underscores
 	invalidChars := regexp.MustCompile(`[<>:"/\\|?*]`)
@@ -106,7 +119,7 @@ func SanitizeFilename(filename string) string {
 }
 
 // SanitizeURL converts a URL into a safe filename component
-// Example: "https://rancher.example.com" -> "rancher-example-com"
+// Example: "https://rancher.example.com" -> "rancher-example-com".
 func SanitizeURL(url string) string {
 	// Remove protocol
 	cleaned := strings.TrimPrefix(url, "https://")

@@ -71,7 +71,7 @@ func TestClient_Authenticate_Success(t *testing.T) {
 			t.Errorf("Expected action=login query parameter, got %s", r.URL.Query().Get("action"))
 		}
 
-		if r.Method != "POST" {
+		if r.Method != http.MethodPost {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
 
@@ -110,7 +110,6 @@ func TestClient_Authenticate_Success(t *testing.T) {
 
 	client := NewClient(rancherServer)
 	token, err := client.Authenticate(context.Background(), "password123")
-
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
@@ -125,7 +124,7 @@ func TestClient_Authenticate_Success(t *testing.T) {
 }
 
 func TestClient_Authenticate_WrongCredentials(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write([]byte(`{"message": "Unauthorized"}`))
 	}))
@@ -151,7 +150,7 @@ func TestClient_Authenticate_WrongCredentials(t *testing.T) {
 }
 
 func TestClient_Authenticate_InvalidJSON(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`invalid json`))
@@ -202,7 +201,7 @@ func TestClient_Authenticate_NetworkError(t *testing.T) {
 
 func TestClient_Authenticate_ContextCancellation(t *testing.T) {
 	// Create a server that delays response
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		time.Sleep(200 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"token": "token-12345"}`))
@@ -249,7 +248,7 @@ func TestClient_GetClusters_Success(t *testing.T) {
 			t.Errorf("Expected path /v3/clusters, got %s", r.URL.Path)
 		}
 
-		if r.Method != "GET" {
+		if r.Method != http.MethodGet {
 			t.Errorf("Expected GET request, got %s", r.Method)
 		}
 
@@ -274,7 +273,6 @@ func TestClient_GetClusters_Success(t *testing.T) {
 	client.token = "token-12345" // Set token directly for testing
 
 	clusters, err := client.GetClusters(context.Background())
-
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
@@ -308,7 +306,7 @@ func TestClient_GetClusters_Success(t *testing.T) {
 }
 
 func TestClient_GetClusters_Unauthorized(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write([]byte(`{"message": "Unauthorized"}`))
 	}))
@@ -350,7 +348,7 @@ func TestClient_GetClusters_NotAuthenticated(t *testing.T) {
 }
 
 func TestClient_GetClusters_InvalidJSON(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`invalid json`))
@@ -378,7 +376,7 @@ func TestClient_GetClusters_InvalidJSON(t *testing.T) {
 func TestClient_GetClusters_EmptyResponse(t *testing.T) {
 	mockResponse := `{"data": []}`
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(mockResponse))
@@ -395,7 +393,6 @@ func TestClient_GetClusters_EmptyResponse(t *testing.T) {
 	client.token = "token-12345"
 
 	clusters, err := client.GetClusters(context.Background())
-
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
@@ -434,7 +431,7 @@ users:
 			t.Errorf("Expected action=generateKubeconfig query parameter, got %s", r.URL.Query().Get("action"))
 		}
 
-		if r.Method != "POST" {
+		if r.Method != http.MethodPost {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
 
@@ -464,7 +461,6 @@ users:
 	client.token = "token-12345"
 
 	kubeconfig, err := client.GetKubeconfig(context.Background(), "c-test")
-
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
@@ -475,7 +471,7 @@ users:
 }
 
 func TestClient_GetKubeconfig_Unauthorized(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write([]byte(`{"message": "Unauthorized"}`))
 	}))
@@ -496,7 +492,7 @@ func TestClient_GetKubeconfig_Unauthorized(t *testing.T) {
 }
 
 func TestClient_GetKubeconfig_ClusterNotFound(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte(`{"message": "Cluster not found"}`))
 	}))
@@ -538,7 +534,7 @@ func TestClient_GetKubeconfig_NotAuthenticated(t *testing.T) {
 }
 
 func TestClient_GetKubeconfig_InvalidJSON(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`invalid json`))
@@ -567,7 +563,7 @@ func TestClient_GetKubeconfig_InvalidJSON(t *testing.T) {
 
 func TestClient_makeJSONRequest_GET(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "GET" {
+		if r.Method != http.MethodGet {
 			t.Errorf("Expected GET request, got %s", r.Method)
 		}
 
@@ -584,7 +580,6 @@ func TestClient_makeJSONRequest_GET(t *testing.T) {
 	client := NewClient(config.RancherServer{URL: server.URL})
 
 	body, err := client.makeJSONRequest(context.Background(), "GET", server.URL+"/test", nil)
-
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
@@ -597,7 +592,7 @@ func TestClient_makeJSONRequest_GET(t *testing.T) {
 
 func TestClient_makeJSONRequest_POST_WithPayload(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
+		if r.Method != http.MethodPost {
 			t.Errorf("Expected POST request, got %s", r.Method)
 		}
 
@@ -622,7 +617,6 @@ func TestClient_makeJSONRequest_POST_WithPayload(t *testing.T) {
 	payload := map[string]string{"test": "value"}
 
 	body, err := client.makeJSONRequest(context.Background(), "POST", server.URL+"/test", payload)
-
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
@@ -649,14 +643,13 @@ func TestClient_makeJSONRequest_WithAuthToken(t *testing.T) {
 	client.token = "test-token"
 
 	_, err := client.makeJSONRequest(context.Background(), "GET", server.URL+"/test", nil)
-
 	if err != nil {
 		t.Fatalf("Expected no error, got: %v", err)
 	}
 }
 
 func TestClient_makeJSONRequest_HTTPError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error": "server error"}`))
 	}))

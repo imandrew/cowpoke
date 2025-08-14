@@ -14,7 +14,7 @@ import (
 	"net/http"
 )
 
-// Error categories for cowpoke operations
+// Error categories for cowpoke operations.
 var (
 	ErrNotFound       = errors.New("resource not found")
 	ErrUnauthorized   = errors.New("unauthorized")
@@ -24,7 +24,7 @@ var (
 	ErrAuthentication = errors.New("authentication error")
 )
 
-// AuthenticationError represents authentication-related errors
+// AuthenticationError represents authentication-related errors.
 type AuthenticationError struct {
 	ServerURL string
 	AuthType  string
@@ -32,8 +32,23 @@ type AuthenticationError struct {
 	Err       error
 }
 
+// NewAuthenticationError creates a new authentication error.
+func NewAuthenticationError(serverURL, authType, username string, err error) *AuthenticationError {
+	return &AuthenticationError{
+		ServerURL: serverURL,
+		AuthType:  authType,
+		Username:  username,
+		Err:       err,
+	}
+}
+
 func (e *AuthenticationError) Error() string {
-	return fmt.Sprintf("authentication failed for user '%s' on server '%s' (%s auth)", e.Username, e.ServerURL, e.AuthType)
+	return fmt.Sprintf(
+		"authentication failed for user '%s' on server '%s' (%s auth)",
+		e.Username,
+		e.ServerURL,
+		e.AuthType,
+	)
 }
 
 func (e *AuthenticationError) Unwrap() error {
@@ -44,27 +59,27 @@ func (e *AuthenticationError) Is(target error) bool {
 	return errors.Is(target, ErrAuthentication)
 }
 
-// NewAuthenticationError creates a new authentication error
-func NewAuthenticationError(serverURL, authType, username string, err error) *AuthenticationError {
-	return &AuthenticationError{
-		ServerURL: serverURL,
-		AuthType:  authType,
-		Username:  username,
-		Err:       err,
-	}
-}
-
-// IsAuthentication checks if an error is authentication-related
+// IsAuthentication checks if an error is authentication-related.
 func IsAuthentication(err error) bool {
 	return errors.Is(err, ErrAuthentication)
 }
 
-// ConfigurationError represents configuration-related errors
+// ConfigurationError represents configuration-related errors.
 type ConfigurationError struct {
 	Field   string
 	Value   string
 	Message string
 	Err     error
+}
+
+// NewConfigurationError creates a new configuration error.
+func NewConfigurationError(field, value, message string, err error) *ConfigurationError {
+	return &ConfigurationError{
+		Field:   field,
+		Value:   value,
+		Message: message,
+		Err:     err,
+	}
 }
 
 func (e *ConfigurationError) Error() string {
@@ -82,27 +97,27 @@ func (e *ConfigurationError) Is(target error) bool {
 	return errors.Is(target, ErrConfiguration)
 }
 
-// NewConfigurationError creates a new configuration error
-func NewConfigurationError(field, value, message string, err error) *ConfigurationError {
-	return &ConfigurationError{
-		Field:   field,
-		Value:   value,
-		Message: message,
-		Err:     err,
-	}
-}
-
-// IsConfiguration checks if an error is configuration-related
+// IsConfiguration checks if an error is configuration-related.
 func IsConfiguration(err error) bool {
 	return errors.Is(err, ErrConfiguration)
 }
 
-// ValidationError represents input validation errors
+// ValidationError represents input validation errors.
 type ValidationError struct {
 	Field   string
 	Value   string
 	Rule    string
 	Message string
+}
+
+// NewValidationError creates a new validation error.
+func NewValidationError(field, value, rule, message string) *ValidationError {
+	return &ValidationError{
+		Field:   field,
+		Value:   value,
+		Rule:    rule,
+		Message: message,
+	}
 }
 
 func (e *ValidationError) Error() string {
@@ -116,28 +131,39 @@ func (e *ValidationError) Is(target error) bool {
 	return errors.Is(target, ErrInvalidInput)
 }
 
-// NewValidationError creates a new validation error
-func NewValidationError(field, value, rule, message string) *ValidationError {
-	return &ValidationError{
-		Field:   field,
-		Value:   value,
-		Rule:    rule,
-		Message: message,
-	}
-}
-
-// IsValidation checks if an error is validation-related
+// IsValidation checks if an error is validation-related.
 func IsValidation(err error) bool {
 	return errors.Is(err, ErrInvalidInput)
 }
 
-// HTTPError represents an HTTP-related error
+// HTTPError represents an HTTP-related error.
 type HTTPError struct {
 	StatusCode int
 	Method     string
 	URL        string
 	Message    string
 	Err        error
+}
+
+// NewHTTPError creates a new HTTP error.
+func NewHTTPError(statusCode int, method, url, message string) *HTTPError {
+	return &HTTPError{
+		StatusCode: statusCode,
+		Method:     method,
+		URL:        url,
+		Message:    message,
+	}
+}
+
+// NewHTTPErrorWithCause creates a new HTTP error with an underlying cause.
+func NewHTTPErrorWithCause(statusCode int, method, url, message string, err error) *HTTPError {
+	return &HTTPError{
+		StatusCode: statusCode,
+		Method:     method,
+		URL:        url,
+		Message:    message,
+		Err:        err,
+	}
 }
 
 func (e *HTTPError) Error() string {
@@ -164,28 +190,7 @@ func (e *HTTPError) Is(target error) bool {
 	}
 }
 
-// NewHTTPError creates a new HTTP error
-func NewHTTPError(statusCode int, method, url, message string) *HTTPError {
-	return &HTTPError{
-		StatusCode: statusCode,
-		Method:     method,
-		URL:        url,
-		Message:    message,
-	}
-}
-
-// NewHTTPErrorWithCause creates a new HTTP error with an underlying cause
-func NewHTTPErrorWithCause(statusCode int, method, url, message string, err error) *HTTPError {
-	return &HTTPError{
-		StatusCode: statusCode,
-		Method:     method,
-		URL:        url,
-		Message:    message,
-		Err:        err,
-	}
-}
-
-// IsHTTPStatus checks if an error represents a specific HTTP status
+// IsHTTPStatus checks if an error represents a specific HTTP status.
 func IsHTTPStatus(err error, statusCode int) bool {
 	var httpErr *HTTPError
 	if errors.As(err, &httpErr) {
@@ -194,9 +199,20 @@ func IsHTTPStatus(err error, statusCode int) bool {
 	return false
 }
 
-// MultiError represents multiple errors that occurred together
+// MultiError represents multiple errors that occurred together.
 type MultiError struct {
 	Errors []error
+}
+
+// NewMultiError creates a new multi-error from a slice of errors.
+func NewMultiError(errs []error) *MultiError {
+	var filteredErrors []error
+	for _, err := range errs {
+		if err != nil {
+			filteredErrors = append(filteredErrors, err)
+		}
+	}
+	return &MultiError{Errors: filteredErrors}
 }
 
 func (e *MultiError) Error() string {
@@ -231,18 +247,7 @@ func (e *MultiError) As(target any) bool {
 	return false
 }
 
-// NewMultiError creates a new multi-error from a slice of errors
-func NewMultiError(errs []error) *MultiError {
-	var filteredErrors []error
-	for _, err := range errs {
-		if err != nil {
-			filteredErrors = append(filteredErrors, err)
-		}
-	}
-	return &MultiError{Errors: filteredErrors}
-}
-
-// Join creates a MultiError from multiple errors, filtering out nils
+// Join creates a MultiError from multiple errors, filtering out nils.
 func Join(errs ...error) error {
 	var nonNilErrors []error
 	for _, err := range errs {
@@ -261,19 +266,19 @@ func Join(errs ...error) error {
 	return NewMultiError(nonNilErrors)
 }
 
-// IsNotFound checks if an error represents a "not found" condition
+// IsNotFound checks if an error represents a "not found" condition.
 func IsNotFound(err error) bool {
 	return errors.Is(err, ErrNotFound) || IsHTTPStatus(err, http.StatusNotFound)
 }
 
-// IsUnauthorized checks if an error represents an authorization failure
+// IsUnauthorized checks if an error represents an authorization failure.
 func IsUnauthorized(err error) bool {
 	return errors.Is(err, ErrUnauthorized) ||
 		IsHTTPStatus(err, http.StatusUnauthorized) ||
 		IsHTTPStatus(err, http.StatusForbidden)
 }
 
-// IsNetwork checks if an error is network-related
+// IsNetwork checks if an error is network-related.
 func IsNetwork(err error) bool {
 	return errors.Is(err, ErrNetwork)
 }

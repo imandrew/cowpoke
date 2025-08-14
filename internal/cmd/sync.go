@@ -13,6 +13,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	// syncTimeout is the maximum time allowed for the entire sync operation.
+	syncTimeout = 10 * time.Minute
+)
+
+//nolint:gochecknoglobals // Cobra CLI pattern for subcommand
 var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync kubeconfigs from all Rancher servers",
@@ -22,46 +28,42 @@ By default, the merged kubeconfig is written to ~/.kube/config. Use the --output
 	RunE: runSync,
 }
 
+//nolint:gochecknoinits // Cobra CLI pattern for command registration
 func init() {
 	rootCmd.AddCommand(syncCmd)
-	syncCmd.Flags().StringP("output", "o", "", "Output directory or file path for merged kubeconfig (default: ~/.kube/config)")
+	syncCmd.Flags().
+		StringP("output", "o", "", "Output directory or file path for merged kubeconfig (default: ~/.kube/config)")
 	syncCmd.Flags().BoolP("verbose", "v", false, "Enable verbose logging")
 }
 
-func runSync(cmd *cobra.Command, args []string) error {
-	// Set verbose logging if requested
+func runSync(cmd *cobra.Command, _ []string) error {
 	verbose, _ := cmd.Flags().GetBool("verbose")
 	logging.SetVerbose(verbose)
 
-	// Create context with timeout for the entire sync operation
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
 	defer cancel()
 
-	// Get configuration manager
 	configManager, err := utils.GetConfigManager()
 	if err != nil {
 		return err
 	}
 
-	// Load servers
 	servers, err := configManager.GetServers()
 	if err != nil {
 		return fmt.Errorf("failed to load servers: %w", err)
 	}
 
 	if len(servers) == 0 {
-		fmt.Println("No Rancher servers configured. Use 'cowpoke add' to add servers.")
+		fmt.Fprintln(cmd.OutOrStdout(), "No Rancher servers configured. Use 'cowpoke add' to add servers.")
 		return nil
 	}
 
-	// Set up kubeconfig manager
 	kubeconfigDir, err := utils.GetKubeconfigDir()
 	if err != nil {
 		return err
 	}
 	kubeconfigManager := kubeconfig.NewManager(kubeconfigDir)
 
-	// Create sync processor and process servers
 	logger := logging.Get().With("operation", "sync")
 	processor := NewSyncProcessor(kubeconfigManager, logger)
 	kubeconfigPaths, err := processor.ProcessServers(ctx, servers)
@@ -70,11 +72,10 @@ func runSync(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(kubeconfigPaths) == 0 {
-		fmt.Println("No kubeconfigs were downloaded successfully.")
+		fmt.Fprintln(cmd.OutOrStdout(), "No kubeconfigs were downloaded successfully.")
 		return nil
 	}
 
-	// Determine output path from flag or use default
 	outputPath, err := cmd.Flags().GetString("output")
 	if err != nil {
 		return err
@@ -82,18 +83,14 @@ func runSync(cmd *cobra.Command, args []string) error {
 
 	var finalOutputPath string
 	if outputPath == "" {
-		// Use default ~/.kube/config
 		finalOutputPath, err = utils.GetDefaultKubeconfigPath()
 		if err != nil {
 			return err
 		}
 	} else {
-		// Check if it's a directory or file path
 		if filepath.Ext(outputPath) == "" {
-			// It's a directory, append config filename
 			finalOutputPath = filepath.Join(outputPath, "config")
 		} else {
-			// It's a file path
 			finalOutputPath = outputPath
 		}
 	}
@@ -102,6 +99,7 @@ func runSync(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to merge kubeconfigs: %w", err)
 	}
-	fmt.Printf("Successfully merged %d kubeconfigs into: %s\n", len(kubeconfigPaths), finalOutputPath)
+	fmt.Fprintf(cmd.OutOrStdout(), "Successfully merged %d kubeconfigs into: %s\n",
+		len(kubeconfigPaths), finalOutputPath)
 	return nil
 }

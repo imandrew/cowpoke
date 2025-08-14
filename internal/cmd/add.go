@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+//nolint:gochecknoglobals // Cobra CLI pattern for subcommand
 var addCmd = &cobra.Command{
 	Use:   "add",
 	Short: "Add a new Rancher server to the configuration",
@@ -16,24 +17,23 @@ var addCmd = &cobra.Command{
 	RunE:  runAdd,
 }
 
-var (
-	url      string
-	username string
-	authType string
-)
-
+//nolint:gochecknoinits // Cobra CLI pattern for command registration
 func init() {
 	rootCmd.AddCommand(addCmd)
 
-	addCmd.Flags().StringVarP(&url, "url", "u", "", "Rancher server URL (required)")
-	addCmd.Flags().StringVarP(&username, "username", "n", "", "Username for authentication (required)")
-	addCmd.Flags().StringVarP(&authType, "authtype", "a", "local", "Authentication type (default: local)")
+	addCmd.Flags().StringP("url", "u", "", "Rancher server URL (required)")
+	addCmd.Flags().StringP("username", "n", "", "Username for authentication (required)")
+	addCmd.Flags().StringP("authtype", "a", "local", "Authentication type (default: local)")
 
 	_ = addCmd.MarkFlagRequired("url")
 	_ = addCmd.MarkFlagRequired("username")
 }
 
-func runAdd(cmd *cobra.Command, args []string) error {
+func runAdd(cmd *cobra.Command, _ []string) error {
+	url, _ := cmd.Flags().GetString("url")
+	username, _ := cmd.Flags().GetString("username")
+	authType, _ := cmd.Flags().GetString("authtype")
+
 	configManager, err := utils.GetConfigManager()
 	if err != nil {
 		return err
@@ -51,6 +51,6 @@ func runAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to add server: %w", err)
 	}
 
-	fmt.Printf("Successfully added Rancher server: %s\n", url)
+	fmt.Fprintf(cmd.OutOrStdout(), "Successfully added Rancher server: %s\n", url)
 	return nil
 }

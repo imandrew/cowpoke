@@ -14,15 +14,11 @@ import (
 
 func TestRunList_EmptyConfig(t *testing.T) {
 	tempDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-	defer func() {
-		_ = os.Setenv("HOME", origHome)
-	}()
-	_ = os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Create .config/cowpoke directory
 	cowpokeDir := filepath.Join(tempDir, ".config", "cowpoke")
-	err := os.MkdirAll(cowpokeDir, 0755)
+	err := os.MkdirAll(cowpokeDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create .config/cowpoke directory: %v", err)
 	}
@@ -32,23 +28,12 @@ func TestRunList_EmptyConfig(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.SetOut(&buf)
 
-	// Redirect stdout for runList
-	origStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
 	err = runList(cmd, nil)
 	if err != nil {
 		t.Fatalf("runList failed: %v", err)
 	}
 
-	// Restore stdout and get output
-	_ = w.Close()
-	os.Stdout = origStdout
-
-	output := make([]byte, 1024)
-	n, _ := r.Read(output)
-	outputStr := string(output[:n])
+	outputStr := buf.String()
 
 	if !strings.Contains(outputStr, "No Rancher servers configured") {
 		t.Errorf("Expected 'No Rancher servers configured' message, got: %s", outputStr)
@@ -57,15 +42,11 @@ func TestRunList_EmptyConfig(t *testing.T) {
 
 func TestRunList_WithServers(t *testing.T) {
 	tempDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-	defer func() {
-		_ = os.Setenv("HOME", origHome)
-	}()
-	_ = os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Create .config/cowpoke directory
 	cowpokeDir := filepath.Join(tempDir, ".config", "cowpoke")
-	err := os.MkdirAll(cowpokeDir, 0755)
+	err := os.MkdirAll(cowpokeDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create .config/cowpoke directory: %v", err)
 	}
@@ -99,22 +80,16 @@ func TestRunList_WithServers(t *testing.T) {
 	}
 
 	// Capture output
-	origStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	var buf bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetOut(&buf)
 
-	err = runList(nil, nil)
+	err = runList(cmd, nil)
 	if err != nil {
 		t.Fatalf("runList failed: %v", err)
 	}
 
-	// Restore stdout and get output
-	_ = w.Close()
-	os.Stdout = origStdout
-
-	output := make([]byte, 2048)
-	n, _ := r.Read(output)
-	outputStr := string(output[:n])
+	outputStr := buf.String()
 
 	// Check that both servers are listed
 	if !strings.Contains(outputStr, "Configured Rancher servers (2)") {
@@ -141,13 +116,10 @@ func TestRunList_WithServers(t *testing.T) {
 }
 
 func TestRunList_HomeDirectoryError(t *testing.T) {
-	origHome := os.Getenv("HOME")
-	defer func() {
-		_ = os.Setenv("HOME", origHome)
-	}()
-	_ = os.Unsetenv("HOME")
+	t.Setenv("HOME", "")
 
-	err := runList(nil, nil)
+	cmd := &cobra.Command{}
+	err := runList(cmd, nil)
 	if err == nil {
 		t.Error("Expected error when HOME is not set")
 	}

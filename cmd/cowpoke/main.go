@@ -5,6 +5,8 @@ import (
 )
 
 // Build information. These will be set during build time via ldflags.
+//
+//nolint:gochecknoglobals // Build-time variables set via ldflags
 var (
 	version = "dev"
 	commit  = "none"

@@ -1,7 +1,7 @@
+//nolint:revive // Test file follows main package naming
 package utils
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
@@ -53,14 +53,8 @@ func TestGetConfigManager(t *testing.T) {
 }
 
 func TestPathsWithInvalidHome(t *testing.T) {
-	// Save original HOME
-	origHome := os.Getenv("HOME")
-	defer func() {
-		_ = os.Setenv("HOME", origHome)
-	}()
-
 	// Set invalid HOME
-	_ = os.Unsetenv("HOME")
+	t.Setenv("HOME", "")
 
 	_, err := GetConfigPath()
 	if err == nil {
@@ -143,7 +137,7 @@ func TestIsTerminal(t *testing.T) {
 	}
 }
 
-func TestCanPromptForPassword(t *testing.T) {
+func TestCanPromptForPassword(_ *testing.T) {
 	// This test just ensures the function doesn't panic
 	// The actual terminal detection depends on the environment
 	result := CanPromptForPassword()

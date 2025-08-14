@@ -11,18 +11,9 @@ import (
 // Root Command Tests
 
 func TestExecute_Success(t *testing.T) {
-	// Save original args and restore after test
-	originalArgs := os.Args
-	defer func() { os.Args = originalArgs }()
-
-	// Set args to show help (which should succeed)
-	os.Args = []string{"cowpoke", "--help"}
-
-	// Capture the exit call - Execute() calls os.Exit(1) on error
-	// We'll test this by ensuring it doesn't panic or hang
-	// Since --help exits with code 0, this should complete successfully
-	// Note: This is challenging to test because Execute() calls os.Exit()
-	// For now, we'll test the command structure instead
+	// Since Execute() calls os.Exit(), we can't easily test it directly.
+	// Instead, we'll test the command structure and properties which
+	// validates the command setup without triggering os.Exit().
 
 	// Test that rootCmd is properly initialized
 	if rootCmd.Use != "cowpoke" {
@@ -35,6 +26,17 @@ func TestExecute_Success(t *testing.T) {
 
 	if rootCmd.Long == "" {
 		t.Error("Expected Long description to be set")
+	}
+
+	// Test that the command can be executed with --help without modification
+	// This validates the command structure without global state changes
+	cmd := rootCmd
+	cmd.SetArgs([]string{"--help"})
+
+	// We can't call Execute() because it calls os.Exit(), but we can
+	// verify the command is properly structured for execution
+	if cmd.Runnable() {
+		t.Error("Expected root command to not be directly runnable (should only have subcommands)")
 	}
 }
 
@@ -83,7 +85,7 @@ func TestInitConfig_WithConfigFile(t *testing.T) {
 	configContent := `version: "1.0"
 servers: []
 `
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
@@ -115,13 +117,9 @@ servers: []
 }
 
 func TestInitConfig_WithoutConfigFile(t *testing.T) {
-	// Save original HOME and restore after test
-	originalHome := os.Getenv("HOME")
-	defer func() { _ = os.Setenv("HOME", originalHome) }()
-
 	// Create a temporary home directory
 	tempHome := t.TempDir()
-	_ = os.Setenv("HOME", tempHome)
+	t.Setenv("HOME", tempHome)
 
 	// Save original cfgFile and restore after test
 	originalCfgFile := cfgFile
@@ -162,7 +160,7 @@ func TestInitConfig_ConfigFileRead(t *testing.T) {
 	// Create a temporary directory and config file
 	tempDir := t.TempDir()
 	configDir := filepath.Join(tempDir, ".config", "cowpoke")
-	err := os.MkdirAll(configDir, 0755)
+	err := os.MkdirAll(configDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create config directory: %v", err)
 	}
@@ -176,15 +174,12 @@ servers:
     username: "admin"
     authType: "local"
 `
-	err = os.WriteFile(configPath, []byte(configContent), 0644)
+	err = os.WriteFile(configPath, []byte(configContent), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to create test config file: %v", err)
 	}
 
-	// Save original HOME and restore after test
-	originalHome := os.Getenv("HOME")
-	defer func() { _ = os.Setenv("HOME", originalHome) }()
-	_ = os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Save original cfgFile and restore after test
 	originalCfgFile := cfgFile
@@ -211,10 +206,7 @@ func TestInitConfig_NoConfigFile(t *testing.T) {
 	// Create a temporary directory without config file
 	tempDir := t.TempDir()
 
-	// Save original HOME and restore after test
-	originalHome := os.Getenv("HOME")
-	defer func() { _ = os.Setenv("HOME", originalHome) }()
-	_ = os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Save original cfgFile and restore after test
 	originalCfgFile := cfgFile
@@ -238,7 +230,7 @@ func TestInitConfig_NoConfigFile(t *testing.T) {
 	}
 }
 
-// Test cobra initialization
+// Test cobra initialization.
 func TestCobraInitialization(t *testing.T) {
 	// Verify that cobra.OnInitialize was called with initConfig
 	// This is difficult to test directly, but we can verify the flag setup
@@ -260,7 +252,7 @@ func TestCobraInitialization(t *testing.T) {
 	}
 }
 
-// Integration test for the complete root command setup
+// Integration test for the complete root command setup.
 func TestRootCommandIntegration(t *testing.T) {
 	// Test that the root command has all expected properties
 	if rootCmd.Use != "cowpoke" {
@@ -280,7 +272,7 @@ func TestRootCommandIntegration(t *testing.T) {
 	}
 }
 
-// Test edge cases and error conditions
+// Test edge cases and error conditions.
 func TestInitConfig_EdgeCases(t *testing.T) {
 	// Save original state
 	originalCfgFile := cfgFile

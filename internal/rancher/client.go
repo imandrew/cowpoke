@@ -15,24 +15,44 @@ import (
 	"cowpoke/internal/logging"
 )
 
-// Client represents a Rancher API client
+const (
+	// HTTP client configuration.
+	defaultHTTPTimeout = 30 * time.Second
+
+	// Default retry strategy constants.
+	defaultMaxAttempts = 3
+	defaultMaxDelay    = 30 * time.Second
+	defaultMultiplier  = 2.0
+
+	// HTTP retry strategy constants.
+	httpMaxAttempts = 3
+	httpBaseDelay   = 500 * time.Millisecond
+	httpMaxDelay    = 10 * time.Second
+	httpMultiplier  = 1.5
+
+	// Jitter calculation constants.
+	jitterModulo    = 1000
+	jitterAmplitude = 0.1
+)
+
+// Client represents a Rancher API client.
 type Client struct {
 	server     config.RancherServer
 	httpClient *http.Client
 	token      string
 }
 
-// NewClient creates a new Rancher client
+// NewClient creates a new Rancher client.
 func NewClient(server config.RancherServer) *Client {
 	return &Client{
 		server: server,
 		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: defaultHTTPTimeout,
 		},
 	}
 }
 
-// Request/Response types for authentication
+// Request/Response types for authentication.
 type authRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -44,7 +64,7 @@ type authResponse struct {
 	User  string `json:"user"`
 }
 
-// Request/Response types for clusters API
+// Request/Response types for clusters API.
 type clustersResponse struct {
 	Data []clusterData `json:"data"`
 }
@@ -55,12 +75,12 @@ type clusterData struct {
 	Type string `json:"type"`
 }
 
-// Request/Response types for kubeconfig API
+// Request/Response types for kubeconfig API.
 type kubeconfigResponse struct {
 	Config string `json:"config"`
 }
 
-// Authenticate authenticates the client with Rancher
+// Authenticate authenticates the client with Rancher.
 func (c *Client) Authenticate(ctx context.Context, password string) (string, error) {
 	authURL := fmt.Sprintf("%s/v3-public/%sProviders/%s?action=login",
 		c.server.URL, c.server.AuthType, c.server.AuthType)
@@ -80,7 +100,7 @@ func (c *Client) Authenticate(ctx context.Context, password string) (string, err
 	return response.Token, nil
 }
 
-// makeJSONRequest makes an HTTP request with JSON payload and returns response body
+// makeJSONRequest makes an HTTP request with JSON payload and returns response body.
 func (c *Client) makeJSONRequest(ctx context.Context, method, url string, payload any) ([]byte, error) {
 	var body io.Reader
 	if payload != nil {
@@ -112,17 +132,22 @@ func (c *Client) makeJSONRequest(ctx context.Context, method, url string, payloa
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	if resp.StatusCode >= 400 {
+	if resp.StatusCode >= http.StatusBadRequest {
 		return nil, errors.NewHTTPError(resp.StatusCode, method, url, string(respBody))
 	}
 
 	return respBody, nil
 }
 
-// GetClusters retrieves all clusters from the Rancher server
+// GetClusters retrieves all clusters from the Rancher server.
 func (c *Client) GetClusters(ctx context.Context) ([]config.Cluster, error) {
 	if c.token == "" {
-		return nil, errors.NewAuthenticationError(c.server.URL, c.server.AuthType, c.server.Username, errors.ErrUnauthorized)
+		return nil, errors.NewAuthenticationError(
+			c.server.URL,
+			c.server.AuthType,
+			c.server.Username,
+			errors.ErrUnauthorized,
+		)
 	}
 
 	clustersURL := fmt.Sprintf("%s/v3/clusters", c.server.URL)
@@ -149,10 +174,15 @@ func (c *Client) GetClusters(ctx context.Context) ([]config.Cluster, error) {
 	return clusters, nil
 }
 
-// GetKubeconfig retrieves the kubeconfig for a specific cluster
+// GetKubeconfig retrieves the kubeconfig for a specific cluster.
 func (c *Client) GetKubeconfig(ctx context.Context, clusterID string) ([]byte, error) {
 	if c.token == "" {
-		return nil, errors.NewAuthenticationError(c.server.URL, c.server.AuthType, c.server.Username, errors.ErrUnauthorized)
+		return nil, errors.NewAuthenticationError(
+			c.server.URL,
+			c.server.AuthType,
+			c.server.Username,
+			errors.ErrUnauthorized,
+		)
 	}
 
 	kubeconfigURL := fmt.Sprintf("%s/v3/clusters/%s?action=generateKubeconfig", c.server.URL, clusterID)
@@ -166,7 +196,7 @@ func (c *Client) GetKubeconfig(ctx context.Context, clusterID string) ([]byte, e
 	return []byte(kubeconfigResp.Config), nil
 }
 
-// doRetryableRequest performs an HTTP request with retry logic
+// doRetryableRequest performs an HTTP request with retry logic.
 func (c *Client) doRetryableRequest(ctx context.Context, method, url string, payload any, response any) error {
 	strategy := HTTPStrategy()
 	return c.doWithRetry(ctx, strategy, func() error {
@@ -184,7 +214,7 @@ func (c *Client) doRetryableRequest(ctx context.Context, method, url string, pay
 
 // Retry Strategy and Logic (integrated from retry package)
 
-// Strategy defines retry behavior
+// Strategy defines retry behavior.
 type Strategy struct {
 	MaxAttempts int
 	BaseDelay   time.Duration
@@ -193,32 +223,32 @@ type Strategy struct {
 	Jitter      bool
 }
 
-// DefaultStrategy returns a sensible default retry strategy
+// DefaultStrategy returns a sensible default retry strategy.
 func DefaultStrategy() Strategy {
 	return Strategy{
-		MaxAttempts: 3,
+		MaxAttempts: defaultMaxAttempts,
 		BaseDelay:   time.Second,
-		MaxDelay:    30 * time.Second,
-		Multiplier:  2.0,
+		MaxDelay:    defaultMaxDelay,
+		Multiplier:  defaultMultiplier,
 		Jitter:      true,
 	}
 }
 
-// HTTPStrategy returns a retry strategy optimized for HTTP requests
+// HTTPStrategy returns a retry strategy optimized for HTTP requests.
 func HTTPStrategy() Strategy {
 	return Strategy{
-		MaxAttempts: 3,
-		BaseDelay:   500 * time.Millisecond,
-		MaxDelay:    10 * time.Second,
-		Multiplier:  1.5,
+		MaxAttempts: httpMaxAttempts,
+		BaseDelay:   httpBaseDelay,
+		MaxDelay:    httpMaxDelay,
+		Multiplier:  httpMultiplier,
 		Jitter:      true,
 	}
 }
 
-// RetryFunc represents a function that can be retried
+// RetryFunc represents a function that can be retried.
 type RetryFunc func() error
 
-// isRetryable determines if an error should be retried
+// isRetryable determines if an error should be retried.
 func isRetryable(err error) bool {
 	if err == nil {
 		return false
@@ -230,22 +260,17 @@ func isRetryable(err error) bool {
 	}
 
 	// Check for specific HTTP status codes that are retryable
-	if errors.IsHTTPStatus(err, 429) || // Too Many Requests
-		errors.IsHTTPStatus(err, 502) || // Bad Gateway
-		errors.IsHTTPStatus(err, 503) || // Service Unavailable
-		errors.IsHTTPStatus(err, 504) { // Gateway Timeout
-		return true
-	}
-
-	// Check for timeout errors (context deadline exceeded)
-	if err == context.DeadlineExceeded {
+	if errors.IsHTTPStatus(err, http.StatusTooManyRequests) ||
+		errors.IsHTTPStatus(err, http.StatusBadGateway) ||
+		errors.IsHTTPStatus(err, http.StatusServiceUnavailable) ||
+		errors.IsHTTPStatus(err, http.StatusGatewayTimeout) {
 		return true
 	}
 
 	return false
 }
 
-// calculateDelay computes the delay for the given attempt
+// calculateDelay computes the delay for the given attempt.
 func (s Strategy) calculateDelay(attempt int) time.Duration {
 	if attempt <= 0 {
 		return 0
@@ -259,14 +284,14 @@ func (s Strategy) calculateDelay(attempt int) time.Duration {
 
 	// Add jitter to avoid thundering herd
 	if s.Jitter {
-		jitter := delay * 0.1 * (2.0*float64(time.Now().UnixNano()%1000)/1000.0 - 1.0)
+		jitter := delay * jitterAmplitude * (2.0*float64(time.Now().UnixNano()%jitterModulo)/float64(jitterModulo) - 1.0)
 		delay += jitter
 	}
 
 	return time.Duration(delay)
 }
 
-// doWithRetry executes the given function with retries according to the strategy
+// doWithRetry executes the given function with retries according to the strategy.
 func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFunc) error {
 	logger := logging.Default().With("operation", "retry")
 
@@ -278,7 +303,7 @@ func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFun
 		err := fn()
 		if err == nil {
 			if attempt > 1 {
-				logger.Info("Operation succeeded after retry",
+				logger.InfoContext(ctx, "Operation succeeded after retry",
 					"attempt", attempt,
 					"total_attempts", strategy.MaxAttempts)
 			}
@@ -288,14 +313,14 @@ func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFun
 		lastErr = err
 		allErrors = append(allErrors, err)
 
-		logger.Warn("Operation failed",
+		logger.WarnContext(ctx, "Operation failed",
 			"error", err,
 			"attempt", attempt,
 			"max_attempts", strategy.MaxAttempts)
 
 		// Check if this error is retryable
 		if !isRetryable(err) {
-			logger.Debug("Error is not retryable, stopping retry attempts", "error", err)
+			logger.DebugContext(ctx, "Error is not retryable, stopping retry attempts", "error", err)
 			break
 		}
 
@@ -306,13 +331,13 @@ func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFun
 
 		// Calculate delay and wait
 		delay := strategy.calculateDelay(attempt)
-		logger.Debug("Waiting before retry",
+		logger.DebugContext(ctx, "Waiting before retry",
 			"delay", delay,
 			"next_attempt", attempt+1)
 
 		select {
 		case <-ctx.Done():
-			logger.Debug("Context cancelled during retry delay")
+			logger.DebugContext(ctx, "Context cancelled during retry delay")
 			return fmt.Errorf("retry cancelled: %w", ctx.Err())
 		case <-time.After(delay):
 			// Continue to next attempt
@@ -321,7 +346,7 @@ func (c *Client) doWithRetry(ctx context.Context, strategy Strategy, fn RetryFun
 
 	// All attempts failed, return appropriate error
 	if len(allErrors) > 1 {
-		logger.Error("All retry attempts failed",
+		logger.ErrorContext(ctx, "All retry attempts failed",
 			"attempts", len(allErrors),
 			"last_error", lastErr)
 		return errors.NewMultiError(allErrors)

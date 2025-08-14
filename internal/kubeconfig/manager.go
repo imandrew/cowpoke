@@ -1,6 +1,7 @@
 package kubeconfig
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,11 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/yaml"
+)
+
+const (
+	// LocalClusterName is the identifier used by Rancher for local clusters.
+	LocalClusterName = "local"
 )
 
 type Manager struct {
@@ -24,15 +30,15 @@ func NewManager(baseDir string) *Manager {
 }
 
 func (m *Manager) SaveKubeconfig(cluster config.Cluster, kubeconfigContent []byte) (string, error) {
-	if err := os.MkdirAll(m.baseDir, 0755); err != nil {
+	if err := os.MkdirAll(m.baseDir, 0o750); err != nil {
 		return "", fmt.Errorf("failed to create kubeconfig directory: %w", err)
 	}
 
 	var filename string
 	var processedContent []byte
 
-	if cluster.ID == "local" || cluster.Name == "local" {
-		// Special handling for Rancher local clusters (ID and Name are both "local")
+	if cluster.ID == LocalClusterName || cluster.Name == LocalClusterName {
+		// Special handling for Rancher local clusters (ID and Name are both LocalClusterName)
 		sanitizedURL := utils.SanitizeURL(cluster.ServerURL)
 		uniqueName := fmt.Sprintf("local-%s", sanitizedURL)
 		filename = fmt.Sprintf("%s.yaml", uniqueName)
@@ -50,7 +56,7 @@ func (m *Manager) SaveKubeconfig(cluster config.Cluster, kubeconfigContent []byt
 
 	filePath := filepath.Join(m.baseDir, filename)
 
-	err := os.WriteFile(filePath, processedContent, 0644)
+	err := os.WriteFile(filePath, processedContent, 0o600)
 	if err != nil {
 		return "", fmt.Errorf("failed to write kubeconfig file: %w", err)
 	}
@@ -59,63 +65,18 @@ func (m *Manager) SaveKubeconfig(cluster config.Cluster, kubeconfigContent []byt
 }
 
 // rewriteLocalClusterNames rewrites all "local" references in kubeconfig content
-// to use unique names while preserving server URLs and credentials
+// to use unique names while preserving server URLs and credentials.
 func (m *Manager) rewriteLocalClusterNames(kubeconfigContent []byte, uniqueName string) ([]byte, error) {
-	// Parse the kubeconfig
 	var kubeconfigData map[string]any
 	if err := yaml.Unmarshal(kubeconfigContent, &kubeconfigData); err != nil {
 		return nil, fmt.Errorf("failed to parse kubeconfig: %w", err)
 	}
 
-	// Update clusters section: clusters[].name (preserve server URLs)
-	if clusters, ok := kubeconfigData["clusters"].([]any); ok {
-		for _, clusterInterface := range clusters {
-			if cluster, ok := clusterInterface.(map[string]any); ok {
-				if name, exists := cluster["name"]; exists && name == "local" {
-					cluster["name"] = uniqueName
-				}
-			}
-		}
-	}
+	m.updateClusters(kubeconfigData, uniqueName)
+	m.updateUsers(kubeconfigData, uniqueName)
+	m.updateContexts(kubeconfigData, uniqueName)
+	m.updateCurrentContext(kubeconfigData, uniqueName)
 
-	// Update users section: users[].name (preserve credentials)
-	if users, ok := kubeconfigData["users"].([]any); ok {
-		for _, userInterface := range users {
-			if user, ok := userInterface.(map[string]any); ok {
-				if name, exists := user["name"]; exists && name == "local" {
-					user["name"] = uniqueName
-				}
-			}
-		}
-	}
-
-	// Update contexts section: contexts[].name and nested references
-	if contexts, ok := kubeconfigData["contexts"].([]any); ok {
-		for _, contextInterface := range contexts {
-			if context, ok := contextInterface.(map[string]any); ok {
-				// Update context name: contexts[].name
-				if name, exists := context["name"]; exists && name == "local" {
-					context["name"] = uniqueName
-				}
-				// Update nested context references: contexts[].context.{cluster,user}
-				if contextData, ok := context["context"].(map[string]any); ok {
-					if cluster, exists := contextData["cluster"]; exists && cluster == "local" {
-						contextData["cluster"] = uniqueName
-					}
-					if user, exists := contextData["user"]; exists && user == "local" {
-						contextData["user"] = uniqueName
-					}
-				}
-			}
-		}
-	}
-
-	// Update current-context reference
-	if currentContext, exists := kubeconfigData["current-context"]; exists && currentContext == "local" {
-		kubeconfigData["current-context"] = uniqueName
-	}
-
-	// Marshal back to YAML
 	rewrittenContent, err := yaml.Marshal(kubeconfigData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal rewritten kubeconfig: %w", err)
@@ -124,9 +85,68 @@ func (m *Manager) rewriteLocalClusterNames(kubeconfigContent []byte, uniqueName 
 	return rewrittenContent, nil
 }
 
+// updateClusters updates cluster names in the clusters section.
+func (m *Manager) updateClusters(kubeconfigData map[string]any, uniqueName string) {
+	if clusters, ok := kubeconfigData["clusters"].([]any); ok {
+		for _, clusterInterface := range clusters {
+			if cluster, clusterOk := clusterInterface.(map[string]any); clusterOk {
+				if name, exists := cluster["name"]; exists && name == LocalClusterName {
+					cluster["name"] = uniqueName
+				}
+			}
+		}
+	}
+}
+
+// updateUsers updates user names in the users section.
+func (m *Manager) updateUsers(kubeconfigData map[string]any, uniqueName string) {
+	if users, ok := kubeconfigData["users"].([]any); ok {
+		for _, userInterface := range users {
+			if user, userOk := userInterface.(map[string]any); userOk {
+				if name, exists := user["name"]; exists && name == LocalClusterName {
+					user["name"] = uniqueName
+				}
+			}
+		}
+	}
+}
+
+// updateContexts updates context names and nested references in the contexts section.
+func (m *Manager) updateContexts(kubeconfigData map[string]any, uniqueName string) {
+	if contexts, ok := kubeconfigData["contexts"].([]any); ok {
+		for _, contextInterface := range contexts {
+			if context, contextOk := contextInterface.(map[string]any); contextOk {
+				if name, exists := context["name"]; exists && name == LocalClusterName {
+					context["name"] = uniqueName
+				}
+				m.updateContextReferences(context, uniqueName)
+			}
+		}
+	}
+}
+
+// updateContextReferences updates cluster and user references within a context.
+func (m *Manager) updateContextReferences(context map[string]any, uniqueName string) {
+	if contextData, contextDataOk := context["context"].(map[string]any); contextDataOk {
+		if cluster, exists := contextData["cluster"]; exists && cluster == LocalClusterName {
+			contextData["cluster"] = uniqueName
+		}
+		if user, exists := contextData["user"]; exists && user == LocalClusterName {
+			contextData["user"] = uniqueName
+		}
+	}
+}
+
+// updateCurrentContext updates the current-context reference.
+func (m *Manager) updateCurrentContext(kubeconfigData map[string]any, uniqueName string) {
+	if currentContext, exists := kubeconfigData["current-context"]; exists && currentContext == LocalClusterName {
+		kubeconfigData["current-context"] = uniqueName
+	}
+}
+
 func (m *Manager) MergeKubeconfigs(kubeconfigPaths []string, outputPath string) error {
 	if len(kubeconfigPaths) == 0 {
-		return fmt.Errorf("no kubeconfig files to merge")
+		return errors.New("no kubeconfig files to merge")
 	}
 
 	var mergedConfig *clientcmdapi.Config
@@ -148,7 +168,7 @@ func (m *Manager) MergeKubeconfigs(kubeconfigPaths []string, outputPath string) 
 		}
 	}
 
-	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(outputPath), 0o750); err != nil {
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 

@@ -50,7 +50,7 @@ users:
 		t.Errorf("Expected path %s, got %s", expectedPath, savedPath)
 	}
 
-	if _, err := os.Stat(savedPath); os.IsNotExist(err) {
+	if _, statErr := os.Stat(savedPath); os.IsNotExist(statErr) {
 		t.Error("Kubeconfig file was not created")
 	}
 
@@ -135,7 +135,7 @@ users:
 		t.Fatalf("Failed to merge kubeconfigs: %v", err)
 	}
 
-	if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+	if _, statErr := os.Stat(outputPath); os.IsNotExist(statErr) {
 		t.Error("Merged kubeconfig file was not created")
 	}
 
@@ -214,7 +214,8 @@ clusters:
 
 	// Should sanitize filename - check that the filename portion is sanitized
 	filename := filepath.Base(savedPath)
-	if strings.Contains(filename, "/") || strings.Contains(filename, ":") || strings.Contains(filename, "*") || strings.Contains(filename, "?") {
+	if strings.Contains(filename, "/") || strings.Contains(filename, ":") || strings.Contains(filename, "*") ||
+		strings.Contains(filename, "?") {
 		t.Errorf("Filename should be sanitized, got: %s", filename)
 	}
 
@@ -223,7 +224,7 @@ clusters:
 		t.Errorf("Expected sanitized filename to contain underscores, got: %s", filename)
 	}
 
-	if _, err := os.Stat(savedPath); os.IsNotExist(err) {
+	if _, statErr := os.Stat(savedPath); os.IsNotExist(statErr) {
 		t.Error("Kubeconfig file was not created")
 	}
 }
@@ -383,11 +384,11 @@ func TestKubeconfigManager_SaveKubeconfig_WriteFileError(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Make directory readonly to cause WriteFile to fail
-	err := os.Chmod(tempDir, 0555) // Read and execute only
+	err := os.Chmod(tempDir, 0o555) // Read and execute only
 	if err != nil {
 		t.Skip("Cannot change directory permissions on this system")
 	}
-	defer func() { _ = os.Chmod(tempDir, 0755) }() // Restore permissions
+	defer func() { _ = os.Chmod(tempDir, 0o755) }() // Restore permissions
 
 	cluster := config.Cluster{
 		ID:         "c-cluster1",
@@ -465,16 +466,16 @@ func TestKubeconfigManager_MergeKubeconfigs_WriteOutputError(t *testing.T) {
 	outputDir := filepath.Join(tempDir, "readonly")
 
 	// Create output directory and make it readonly
-	err := os.MkdirAll(outputDir, 0755)
+	err := os.MkdirAll(outputDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create output directory: %v", err)
 	}
 
-	err = os.Chmod(outputDir, 0555) // Read and execute only
+	err = os.Chmod(outputDir, 0o555) // Read and execute only
 	if err != nil {
 		t.Skip("Cannot change directory permissions on this system")
 	}
-	defer func() { _ = os.Chmod(outputDir, 0755) }() // Restore permissions
+	defer func() { _ = os.Chmod(outputDir, 0o755) }() // Restore permissions
 
 	kubeconfig := []byte(`apiVersion: v1
 kind: Config
@@ -562,7 +563,7 @@ users:
 	}
 
 	// Verify file was created
-	if _, err := os.Stat(savedPath); os.IsNotExist(err) {
+	if _, statErr := os.Stat(savedPath); os.IsNotExist(statErr) {
 		t.Error("Kubeconfig file was not created")
 	}
 
@@ -578,7 +579,11 @@ users:
 
 	// Check that "local" references have been replaced with unique name
 	if !strings.Contains(contentStr, expectedUniqueName) {
-		t.Errorf("Expected kubeconfig to contain unique name '%s', but it doesn't. Content:\n%s", expectedUniqueName, contentStr)
+		t.Errorf(
+			"Expected kubeconfig to contain unique name '%s', but it doesn't. Content:\n%s",
+			expectedUniqueName,
+			contentStr,
+		)
 	}
 
 	// Check that server URL is preserved
@@ -624,7 +629,7 @@ clusters:
 	}
 
 	// Verify file was created
-	if _, err := os.Stat(savedPath); os.IsNotExist(err) {
+	if _, statErr := os.Stat(savedPath); os.IsNotExist(statErr) {
 		t.Error("Kubeconfig file was not created")
 	}
 }

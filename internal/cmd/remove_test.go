@@ -6,19 +6,17 @@ import (
 	"testing"
 
 	"cowpoke/internal/config"
+
+	"github.com/spf13/cobra"
 )
 
 func TestRunRemove(t *testing.T) {
 	tempDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-	defer func() {
-		_ = os.Setenv("HOME", origHome)
-	}()
-	_ = os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Create .config/cowpoke directory
 	cowpokeDir := filepath.Join(tempDir, ".config", "cowpoke")
-	err := os.MkdirAll(cowpokeDir, 0755)
+	err := os.MkdirAll(cowpokeDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create .config/cowpoke directory: %v", err)
 	}
@@ -52,9 +50,10 @@ func TestRunRemove(t *testing.T) {
 	}
 
 	// Set test flag and remove server
-	removeURL = "https://rancher1.example.com"
-
-	err = runRemove(nil, nil)
+	cmd := &cobra.Command{}
+	cmd.Flags().String("url", "", "")
+	_ = cmd.Flags().Set("url", "https://rancher1.example.com")
+	err = runRemove(cmd, nil)
 	if err != nil {
 		t.Fatalf("runRemove failed: %v", err)
 	}
@@ -80,36 +79,30 @@ func TestRunRemove(t *testing.T) {
 
 func TestRunRemove_NotFound(t *testing.T) {
 	tempDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-	defer func() {
-		_ = os.Setenv("HOME", origHome)
-	}()
-	_ = os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Create .config/cowpoke directory
 	cowpokeDir := filepath.Join(tempDir, ".config", "cowpoke")
-	err := os.MkdirAll(cowpokeDir, 0755)
+	err := os.MkdirAll(cowpokeDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create .config/cowpoke directory: %v", err)
 	}
 
 	// Set test flag for non-existent server
-	removeURL = "https://non-existent.example.com"
-
-	err = runRemove(nil, nil)
+	cmd := &cobra.Command{}
+	cmd.Flags().String("url", "", "")
+	_ = cmd.Flags().Set("url", "https://non-existent.example.com")
+	err = runRemove(cmd, nil)
 	if err == nil {
 		t.Error("Expected error when removing non-existent server")
 	}
 }
 
 func TestRunRemove_HomeDirectoryError(t *testing.T) {
-	origHome := os.Getenv("HOME")
-	defer func() {
-		_ = os.Setenv("HOME", origHome)
-	}()
-	_ = os.Unsetenv("HOME")
+	t.Setenv("HOME", "")
 
-	err := runRemove(nil, nil)
+	cmd := &cobra.Command{}
+	err := runRemove(cmd, nil)
 	if err == nil {
 		t.Error("Expected error when HOME is not set")
 	}

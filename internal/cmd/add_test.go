@@ -6,29 +6,30 @@ import (
 	"testing"
 
 	"cowpoke/internal/config"
+
+	"github.com/spf13/cobra"
 )
 
 func TestRunAdd(t *testing.T) {
 	tempDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-	defer func() {
-		_ = os.Setenv("HOME", origHome)
-	}()
-	_ = os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Create .config/cowpoke directory
 	cowpokeDir := filepath.Join(tempDir, ".config", "cowpoke")
-	err := os.MkdirAll(cowpokeDir, 0755)
+	err := os.MkdirAll(cowpokeDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create .config/cowpoke directory: %v", err)
 	}
 
 	// Set test flags
-	url = "https://rancher.example.com"
-	username = "testuser"
-	authType = "local"
-
-	err = runAdd(nil, nil)
+	cmd := &cobra.Command{}
+	cmd.Flags().String("url", "", "")
+	cmd.Flags().String("username", "", "")
+	cmd.Flags().String("authtype", "", "")
+	_ = cmd.Flags().Set("url", "https://rancher.example.com")
+	_ = cmd.Flags().Set("username", "testuser")
+	_ = cmd.Flags().Set("authtype", "local")
+	err = runAdd(cmd, nil)
 	if err != nil {
 		t.Fatalf("runAdd failed: %v", err)
 	}
@@ -62,13 +63,10 @@ func TestRunAdd(t *testing.T) {
 }
 
 func TestRunAdd_HomeDirectoryError(t *testing.T) {
-	origHome := os.Getenv("HOME")
-	defer func() {
-		_ = os.Setenv("HOME", origHome)
-	}()
-	_ = os.Unsetenv("HOME")
+	t.Setenv("HOME", "")
 
-	err := runAdd(nil, nil)
+	cmd := &cobra.Command{}
+	err := runAdd(cmd, nil)
 	if err == nil {
 		t.Error("Expected error when HOME is not set")
 	}
@@ -76,25 +74,24 @@ func TestRunAdd_HomeDirectoryError(t *testing.T) {
 
 func TestRunAdd_InvalidAuthType(t *testing.T) {
 	tempDir := t.TempDir()
-	origHome := os.Getenv("HOME")
-	defer func() {
-		_ = os.Setenv("HOME", origHome)
-	}()
-	_ = os.Setenv("HOME", tempDir)
+	t.Setenv("HOME", tempDir)
 
 	// Create .config/cowpoke directory
 	cowpokeDir := filepath.Join(tempDir, ".config", "cowpoke")
-	err := os.MkdirAll(cowpokeDir, 0755)
+	err := os.MkdirAll(cowpokeDir, 0o755)
 	if err != nil {
 		t.Fatalf("Failed to create .config/cowpoke directory: %v", err)
 	}
 
 	// Set test flags with invalid auth type
-	url = "https://rancher.example.com"
-	username = "testuser"
-	authType = "invalid-auth-type"
-
-	err = runAdd(nil, nil)
+	cmd := &cobra.Command{}
+	cmd.Flags().String("url", "", "")
+	cmd.Flags().String("username", "", "")
+	cmd.Flags().String("authtype", "", "")
+	_ = cmd.Flags().Set("url", "https://rancher.example.com")
+	_ = cmd.Flags().Set("username", "testuser")
+	_ = cmd.Flags().Set("authtype", "invalid-auth-type")
+	err = runAdd(cmd, nil)
 	if err == nil {
 		t.Error("Expected error when using invalid auth type")
 	}
@@ -110,7 +107,7 @@ func TestRunAdd_InvalidAuthType(t *testing.T) {
 	}
 }
 
-// Helper function to check if string contains substring
+// Helper function to check if string contains substring.
 func contains(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {

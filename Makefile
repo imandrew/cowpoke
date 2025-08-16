@@ -1,11 +1,15 @@
-.PHONY: lint test build clean install goreleaser-build goreleaser-check help
+.PHONY: lint lint-check test build clean install goreleaser-build goreleaser-check help
 
 # Default target
 all: lint test build
 
-# Linting
+# Linting and formatting (applies formatters and runs linters)
 lint:
-	golangci-lint run
+	golangci-lint run --fix ./...
+
+# Linting without fixes (CI friendly)
+lint-check:
+	golangci-lint run ./...
 
 # Testing
 test:
@@ -13,7 +17,7 @@ test:
 
 # Build the binary
 build:
-	go build -v ./cmd/cowpoke
+	go build -v .
 
 # Clean build artifacts
 clean:
@@ -33,25 +37,16 @@ goreleaser-build:
 goreleaser-check:
 	goreleaser check
 
-# Format code with gofumpt
-fmt:
-	gofumpt -l -w .
-
-# Check formatting without making changes
-fmt-check:
-	gofumpt -l .
-
 # Show help
 help:
 	@echo "Available targets:"
 	@echo "  all              - Run lint, test, and build"
-	@echo "  lint             - Run golangci-lint"
+	@echo "  lint             - Run golangci-lint with formatters and linters"
+	@echo "  lint-check       - Run golangci-lint without fixes (CI friendly)"
 	@echo "  test             - Run all tests with coverage"
 	@echo "  build            - Build the cowpoke binary"
 	@echo "  clean            - Clean build artifacts"
 	@echo "  install          - Install/update dependencies"
 	@echo "  goreleaser-build - Build with goreleaser (snapshot)"
 	@echo "  goreleaser-check - Check goreleaser configuration"
-	@echo "  fmt              - Format code with gofumpt"
-	@echo "  fmt-check        - Check code formatting (CI friendly)"
 	@echo "  help             - Show this help message"

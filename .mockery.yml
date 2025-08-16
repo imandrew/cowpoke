@@ -1,0 +1,15 @@
+all: false
+dir: "{{.InterfaceDir}}"
+filename: "mock_{{.InterfaceName | lower}}.go"
+structname: "Mock{{.InterfaceName}}"
+pkgname: "mocks"
+template: testify
+packages:
+  cowpoke/internal/domain:
+    config:
+      all: true
+      dir: "internal/mocks"
+  cowpoke/internal/migrations:
+    config:
+      all: true
+      dir: "internal/mocks"

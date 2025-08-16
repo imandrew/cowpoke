@@ -21,20 +21,15 @@ jobs:
     - name: Install dependencies
       run: go mod download
       
-    - name: Install gofumpt
-      run: go install mvdan.cc/gofumpt@latest
-      
-    - name: Check code formatting
-      run: make fmt-check
-      
     - name: Run tests
-      run: go test -v -race -coverprofile=coverage.out ./...
-      
-    - name: Run go vet
-      run: go vet ./...
+      run: go test -v -race ./...
         
     - name: Build
-      run: go build -v ./cmd/cowpoke
+      uses: goreleaser/goreleaser-action@v6
+      with:
+        distribution: goreleaser
+        version: '~> v2'
+        args: build --snapshot --clean
 
   lint:
     runs-on: ubuntu-latest

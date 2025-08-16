@@ -7,6 +7,11 @@ formatters:
   enable:
   - goimports
   - golines
+  - gofumpt
+
+  exclusions:
+    paths:
+    - internal/mocks
 
   settings:
     goimports:
@@ -15,6 +20,10 @@ formatters:
 
     golines:
       max-len: 120
+      
+    gofumpt:
+      module-path: cowpoke
+      extra-rules: true
 
 linters:
   enable:
@@ -237,6 +246,8 @@ linters:
 
   exclusions:
     warn-unused: true
+    paths:
+    - internal/mocks
     presets:
     - std-error-handling
     - common-false-positives

@@ -4,11 +4,13 @@ A CLI tool for managing multiple Rancher servers and downloading kubeconfigs fro
 
 ## Features
 
-- **Multi-Server Management**: Configure and manage connections to multiple Rancher servers
-- **Automatic Kubeconfig Merging**: Download and intelligently merge kubeconfigs from all clusters
-- **Conflict-Free Resource Naming**: Automatically handles naming conflicts when merging kubeconfigs from different servers
-- **Secure Authentication**: Supports multiple authentication types with secure password handling
-- **Automatic Configuration Migration**: Seamlessly migrates from v1.x to v2.0 configuration format
+- **Multi-Server Management**: Connect to multiple Rancher environments (prod, staging, dev) from one tool
+- **One-Command Sync**: Get all your cluster access with a single `cowpoke sync` command
+- **Smart Filtering**: Skip test/dev clusters with `--exclude` patterns when syncing production configs
+- **No Name Conflicts**: Safely merge clusters with identical names from different Rancher servers
+- **Fast Downloads**: Concurrent processing speeds up syncing from multiple servers
+- **Secure by Default**: Never stores passwords, supports all Rancher authentication methods
+- **Zero Configuration**: Automatically migrates from older versions
 
 ## Installation
 
@@ -39,8 +41,9 @@ cowpoke add --url https://rancher.example.com --username admin --authtype local
 # Add a server with OpenLDAP authentication
 cowpoke add --url https://rancher.corp.com --username jdoe --authtype openldap
 
-# Add a server with Active Directory
-cowpoke add --url https://rancher.internal.com --username DOMAIN\\user --authtype activeDirectory
+# Add a server with Active Directory (supports both formats)
+cowpoke add --url https://rancher.internal.com --username DOMAIN\\user --authtype activedirectory
+cowpoke add --url https://rancher.internal.com --username user@domain.com --authtype activedirectory
 ```
 
 ### List Configured Servers
@@ -87,6 +90,12 @@ cowpoke sync --insecure
 
 # Clean up temporary kubeconfig files after merging
 cowpoke sync --cleanup-temp-files
+
+# Exclude clusters by name using regex patterns
+cowpoke sync --exclude "^test-.*" --exclude ".*-staging$"
+
+# Combine multiple options
+cowpoke sync --output /custom/kubeconfig --exclude "^dev-.*" --cleanup-temp-files --insecure
 ```
 
 ### Global Options
@@ -103,7 +112,7 @@ cowpoke --config /path/to/config.yaml list
 
 Configuration is stored in `~/.config/cowpoke/config.yaml`.
 
-### Configuration Format (v2.0)
+### Configuration Format
 
 ```yaml
 version: "2.0"
@@ -116,15 +125,7 @@ servers:
     authType: "openldap"
 ```
 
-### Automatic Migration from v1.x
-
-When upgrading from v1.x to v2.0, your configuration will be automatically migrated on first use. The migration:
-- Preserves all server connections
-- Removes deprecated `id` and `name` fields
-- Generates dynamic IDs based on server domains
-- Updates the version to "2.0"
-
-Your original configuration is replaced with the migrated version after successful migration.
+Configuration is automatically migrated from older versions when you first run the tool.
 
 ## Authentication
 
@@ -143,7 +144,7 @@ Cowpoke securely handles passwords for Rancher authentication:
 
 - `local` - Local Rancher authentication
 - `openldap` - OpenLDAP authentication
-- `activeDirectory` - Active Directory authentication
+- `activedirectory` - Active Directory authentication
 - `github` - GitHub OAuth authentication
 - `googleoauth` - Google OAuth authentication
 - `shibboleth` - Shibboleth authentication
@@ -153,44 +154,47 @@ Cowpoke securely handles passwords for Rancher authentication:
 - `okta` - Okta authentication
 - `freeipa` - FreeIPA authentication
 
-## How It Works
-
-### Server ID Generation
-
-Each Rancher server is assigned a unique 8-character ID generated from the SHA256 hash of its domain. This ensures:
-- Consistent IDs across different installations
-- No conflicts when merging kubeconfigs
-- Idempotent operations (same domain always generates same ID)
-
-### Kubeconfig Merging
+## How Kubeconfig Merging Works
 
 When syncing kubeconfigs from multiple Rancher servers, Cowpoke:
-1. Downloads kubeconfigs for all clusters from each server
-2. Appends the server ID to all resource names (clusters, users, contexts)
-3. Merges all kubeconfigs into a single file
-4. Prevents naming conflicts between different Rancher servers
+1. Authenticates with all Rancher servers concurrently
+2. Discovers all available clusters from each server
+3. Filters out clusters matching any `--exclude` patterns (before downloading)
+4. Downloads kubeconfigs only for the remaining clusters
+5. Appends a unique server ID to all resource names (clusters, users, contexts)
+6. Merges all kubeconfigs into a single file
+7. Prevents naming conflicts between different Rancher servers
 
-Example: A cluster named `production` from server `rancher.example.com` (ID: `55110d2f`) becomes `production-55110d2f` in the merged kubeconfig.
+Example: A cluster named `production` from server `rancher.example.com` becomes `production-55110d2f` in the merged kubeconfig.
 
-## Architecture (v2.0)
+### Cluster Filtering
 
-Cowpoke v2.0 features a clean, maintainable architecture:
+Use the `--exclude` flag to filter out clusters by name using regex patterns. This is useful for:
+- Excluding test/development clusters from production kubeconfigs
+- Filtering out temporary or staging environments
+- Reducing the size of merged kubeconfigs
 
-- **Domain-Driven Design**: Clear separation of business logic and infrastructure
-- **Dependency Injection**: Flexible, testable component composition
-- **Interface-Based Design**: Loose coupling between components
-- **Comprehensive Testing**: Unit tests with mocked dependencies
-- **Security-First**: Secure password handling, proper file permissions
+```bash
+# Exclude all clusters starting with "test-"
+cowpoke sync --exclude "^test-.*"
 
-## Development
+# Exclude all clusters ending with "-staging"
+cowpoke sync --exclude ".*-staging$"
 
-### Requirements
+# Multiple patterns (exclude clusters matching any pattern)
+cowpoke sync --exclude "^test-.*" --exclude "^dev-.*" --exclude ".*-staging$"
 
-- Go 1.21+
-- golangci-lint (for linting)
-- make (for build automation)
+# Complex patterns
+cowpoke sync --exclude "^(test|dev|staging)-.*"
+```
 
-### Building from Source
+**Pattern Examples:**
+- `^test-.*` - Matches clusters starting with "test-"
+- `.*-staging$` - Matches clusters ending with "-staging"
+- `^temp-cluster-[0-9]+$` - Matches "temp-cluster-123" but not "temp-cluster-abc"
+- `^(dev|test|staging)-.*` - Matches clusters starting with "dev-", "test-", or "staging-"
+
+## Building from Source
 
 ```bash
 # Clone the repository
@@ -199,55 +203,25 @@ cd cowpoke
 
 # Build the binary
 make build
-
-# Run tests
-make test
-
-# Run linter
-make lint
-
-# Clean build artifacts
-make clean
 ```
 
-### Project Structure
-
-```
-cowpoke/
-├── cmd/                    # CLI commands (add, list, remove, sync)
-├── internal/
-│   ├── adapters/          # External interfaces (HTTP, filesystem, terminal)
-│   ├── app/               # Application initialization and DI
-│   ├── commands/          # Command implementations
-│   ├── domain/            # Domain models and interfaces
-│   ├── migrations/        # Configuration migration logic
-│   ├── services/          # Business logic services
-│   └── mocks/             # Test mocks
-├── main.go                # Application entry point
-└── README.md
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-go test ./...
-
-# Run tests with coverage
-go test -cover ./...
-
-# Run specific package tests
-go test ./internal/services/...
-```
+Requirements: Go 1.21+
 
 ## Troubleshooting
 
 ### Common Issues
 
 1. **"No servers configured"**: Add at least one Rancher server using `cowpoke add`
-2. **Authentication failures**: Verify your username and password are correct
-3. **Network errors**: Check connectivity to your Rancher servers
+2. **Authentication failures**: 
+   - Verify your username and password are correct
+   - Check that the auth type matches your Rancher server configuration
+   - For non-interactive use, ensure `RANCHER_PASSWORD` environment variable is set
+3. **Network errors**: 
+   - Check connectivity to your Rancher servers
+   - Use `--insecure` flag if you have self-signed certificates
 4. **Permission denied**: Ensure you have write access to `~/.config/cowpoke/` and `~/.kube/`
+5. **"No kubeconfigs downloaded"**: Check if clusters are being filtered out by `--exclude` patterns
+6. **Invalid regex patterns**: Verify your `--exclude` patterns are valid regex expressions
 
 ### Debug Mode
 

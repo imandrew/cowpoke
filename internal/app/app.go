@@ -9,23 +9,25 @@ import (
 
 // App contains all application dependencies.
 type App struct {
-	// Core configuration dependencies (always needed)
+	// Core configuration dependencies (always needed).
 	ConfigRepo     domain.ConfigRepository
 	ConfigProvider domain.ConfigProvider
 
-	// Factories for creating services on-demand
-	RancherServiceFactory domain.RancherServiceFactory
+	// Core services (created once with appropriate TLS settings).
+	RancherClient     domain.RancherClient
+	KubeconfigHandler domain.KubeconfigHandler
+	SyncOrchestrator  domain.SyncOrchestrator
 
-	// File operations (needed by multiple commands)
+	// File operations (needed by multiple commands).
 	FileSystem domain.FileSystemAdapter
 
-	// I/O dependencies
+	// I/O dependencies.
 	PasswordReader domain.PasswordReader
 
-	// Logging
+	// Logging.
 	Logger *slog.Logger
 
-	// Configuration
+	// Configuration.
 	Config *Config
 }
 

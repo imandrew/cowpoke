@@ -31,24 +31,19 @@ func init() {
 }
 
 func runAdd(cmd *cobra.Command, _ []string) error {
-	// Get the initialized app instance
 	app := GetApp()
 	if app == nil {
 		return errors.New("application not initialized")
 	}
 
-	// Extract flags
 	url, _ := cmd.Flags().GetString("url")
 	username, _ := cmd.Flags().GetString("username")
 	authType, _ := cmd.Flags().GetString("authtype")
 
-	// Create add command with injected dependencies
 	addCommand := commands.NewAddCommand(
 		app.ConfigRepo,
 		app.Logger,
 	)
-
-	// Execute the add command
 	err := addCommand.Execute(context.Background(), commands.AddRequest{
 		URL:      url,
 		Username: username,

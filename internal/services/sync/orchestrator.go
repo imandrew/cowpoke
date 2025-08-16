@@ -15,38 +15,26 @@ const (
 	maxConcurrentDownloads = 5
 )
 
-// Manager orchestrates concurrent kubeconfig synchronization from multiple Rancher servers.
-type Manager struct {
-	rancherAuthenticator domain.RancherAuthenticator
-	clusterLister        domain.ClusterLister
-	kubeconfigFetcher    domain.KubeconfigFetcher
-	kubeconfigWriter     domain.KubeconfigWriter
-	kubeconfigMerger     domain.KubeconfigMerger
-	kubeconfigCleaner    domain.KubeconfigCleaner
-	configProvider       domain.ConfigProvider
-	logger               *slog.Logger
+// Orchestrator orchestrates concurrent kubeconfig synchronization from multiple Rancher servers.
+type Orchestrator struct {
+	rancherClient     domain.RancherClient
+	kubeconfigHandler domain.KubeconfigHandler
+	configProvider    domain.ConfigProvider
+	logger            *slog.Logger
 }
 
-// NewManager creates a new sync manager.
-func NewManager(
-	rancherAuthenticator domain.RancherAuthenticator,
-	clusterLister domain.ClusterLister,
-	kubeconfigFetcher domain.KubeconfigFetcher,
-	kubeconfigWriter domain.KubeconfigWriter,
-	kubeconfigMerger domain.KubeconfigMerger,
-	kubeconfigCleaner domain.KubeconfigCleaner,
+// NewOrchestrator creates a new sync orchestrator.
+func NewOrchestrator(
+	rancherClient domain.RancherClient,
+	kubeconfigHandler domain.KubeconfigHandler,
 	configProvider domain.ConfigProvider,
 	logger *slog.Logger,
-) *Manager {
-	return &Manager{
-		rancherAuthenticator: rancherAuthenticator,
-		clusterLister:        clusterLister,
-		kubeconfigFetcher:    kubeconfigFetcher,
-		kubeconfigWriter:     kubeconfigWriter,
-		kubeconfigMerger:     kubeconfigMerger,
-		kubeconfigCleaner:    kubeconfigCleaner,
-		configProvider:       configProvider,
-		logger:               logger,
+) *Orchestrator {
+	return &Orchestrator{
+		rancherClient:     rancherClient,
+		kubeconfigHandler: kubeconfigHandler,
+		configProvider:    configProvider,
+		logger:            logger,
 	}
 }
 
@@ -79,38 +67,39 @@ type DownloadResult struct {
 	Error    error
 }
 
-// SyncAllServers performs concurrent discovery and download of kubeconfigs from all servers.
-func (m *Manager) SyncAllServers(
+// SyncServers performs concurrent discovery and download of kubeconfigs from the provided servers.
+func (o *Orchestrator) SyncServers(
 	ctx context.Context,
 	servers []domain.ConfigServer,
 	passwords map[string]string,
+	filter domain.ClusterFilter,
 ) ([]string, error) {
 	if len(servers) == 0 {
 		return nil, nil
 	}
 
-	m.logger.InfoContext(ctx, "Starting concurrent sync",
+	o.logger.InfoContext(ctx, "Starting concurrent sync",
 		"servers", len(servers),
 		"maxConcurrentDownloads", maxConcurrentDownloads)
 
 	// Phase 1: Concurrent cluster discovery
-	downloadTasks, err := m.discoverClustersAsync(ctx, servers, passwords)
+	downloadTasks, err := o.discoverClustersAsync(ctx, servers, passwords, filter)
 	if err != nil {
 		return nil, fmt.Errorf("cluster discovery failed: %w", err)
 	}
 
 	if len(downloadTasks) == 0 {
-		m.logger.WarnContext(ctx, "No clusters discovered from any server")
+		o.logger.WarnContext(ctx, "No clusters discovered from any server")
 		return nil, nil
 	}
 
 	// Phase 2: Concurrent kubeconfig downloads
-	kubeconfigPaths, err := m.downloadKubeconfigsAsync(ctx, downloadTasks)
+	kubeconfigPaths, err := o.downloadKubeconfigsAsync(ctx, downloadTasks)
 	if err != nil {
 		return nil, fmt.Errorf("kubeconfig downloads failed: %w", err)
 	}
 
-	m.logger.InfoContext(ctx, "Concurrent sync completed",
+	o.logger.InfoContext(ctx, "Concurrent sync completed",
 		"servers", len(servers),
 		"clusters", len(downloadTasks),
 		"kubeconfigs", len(kubeconfigPaths))
@@ -119,17 +108,18 @@ func (m *Manager) SyncAllServers(
 }
 
 // discoverClustersAsync performs concurrent authentication and cluster discovery.
-func (m *Manager) discoverClustersAsync(
+func (o *Orchestrator) discoverClustersAsync(
 	ctx context.Context,
 	servers []domain.ConfigServer,
 	passwords map[string]string,
+	filter domain.ClusterFilter,
 ) ([]DownloadTask, error) {
 	// Create discovery tasks
 	discoveryTasks := make([]DiscoveryTask, 0, len(servers))
 	for _, server := range servers {
 		password, exists := passwords[server.ID()]
 		if !exists {
-			m.logger.WarnContext(ctx, "No password provided for server", "server", server.URL)
+			o.logger.WarnContext(ctx, "No password provided for server", "server", server.URL)
 			continue
 		}
 		discoveryTasks = append(discoveryTasks, DiscoveryTask{
@@ -146,7 +136,7 @@ func (m *Manager) discoverClustersAsync(
 		wg.Add(1)
 		go func(task DiscoveryTask) {
 			defer wg.Done()
-			m.discoverClustersForServer(ctx, task, resultChan)
+			o.discoverClustersForServer(ctx, task, resultChan)
 		}(task)
 	}
 
@@ -155,7 +145,7 @@ func (m *Manager) discoverClustersAsync(
 	close(resultChan)
 
 	// Get kubeconfig directory for download tasks
-	kubeconfigDir, err := m.configProvider.GetKubeconfigDir()
+	kubeconfigDir, err := o.configProvider.GetKubeconfigDir()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get kubeconfig directory: %w", err)
 	}
@@ -164,13 +154,21 @@ func (m *Manager) discoverClustersAsync(
 	var downloadTasks []DownloadTask
 	for result := range resultChan {
 		if result.Error != nil {
-			m.logger.ErrorContext(ctx, "Failed to discover clusters for server",
+			o.logger.ErrorContext(ctx, "Failed to discover clusters for server",
 				"server", result.Server.URL,
 				"error", result.Error)
 			continue
 		}
 
 		for _, cluster := range result.Clusters {
+			// Apply filter to exclude clusters
+			if filter.ShouldExclude(cluster.Name) {
+				o.logger.DebugContext(ctx, "Excluding cluster",
+					"cluster", cluster.Name,
+					"server", result.Server.URL)
+				continue
+			}
+
 			downloadTasks = append(downloadTasks, DownloadTask{
 				Server:    result.Server,
 				Cluster:   cluster,
@@ -184,15 +182,15 @@ func (m *Manager) discoverClustersAsync(
 }
 
 // discoverClustersForServer authenticates with a server and discovers its clusters.
-func (m *Manager) discoverClustersForServer(
+func (o *Orchestrator) discoverClustersForServer(
 	ctx context.Context,
 	task DiscoveryTask,
 	resultChan chan<- DiscoveryResult,
 ) {
-	m.logger.InfoContext(ctx, "Discovering clusters for server", "server", task.Server.URL)
+	o.logger.InfoContext(ctx, "Discovering clusters for server", "server", task.Server.URL)
 
 	// Authenticate with the server
-	token, err := m.rancherAuthenticator.Authenticate(ctx, task.Server, task.Password)
+	token, err := o.rancherClient.Authenticate(ctx, task.Server, task.Password)
 	if err != nil {
 		resultChan <- DiscoveryResult{
 			Server: task.Server,
@@ -202,7 +200,7 @@ func (m *Manager) discoverClustersForServer(
 	}
 
 	// Get list of clusters
-	clusters, err := m.clusterLister.ListClusters(ctx, token, task.Server)
+	clusters, err := o.rancherClient.ListClusters(ctx, token, task.Server)
 	if err != nil {
 		resultChan <- DiscoveryResult{
 			Server: task.Server,
@@ -211,7 +209,7 @@ func (m *Manager) discoverClustersForServer(
 		return
 	}
 
-	m.logger.InfoContext(ctx, "Discovered clusters for server",
+	o.logger.InfoContext(ctx, "Discovered clusters for server",
 		"server", task.Server.URL,
 		"clusters", len(clusters))
 
@@ -224,7 +222,7 @@ func (m *Manager) discoverClustersForServer(
 }
 
 // downloadKubeconfigsAsync performs concurrent kubeconfig downloads using a worker pool.
-func (m *Manager) downloadKubeconfigsAsync(
+func (o *Orchestrator) downloadKubeconfigsAsync(
 	ctx context.Context,
 	downloadTasks []DownloadTask,
 ) ([]string, error) {
@@ -232,7 +230,7 @@ func (m *Manager) downloadKubeconfigsAsync(
 		return nil, nil
 	}
 
-	m.logger.InfoContext(ctx, "Starting concurrent downloads",
+	o.logger.InfoContext(ctx, "Starting concurrent downloads",
 		"tasks", len(downloadTasks),
 		"workers", maxConcurrentDownloads)
 
@@ -246,7 +244,7 @@ func (m *Manager) downloadKubeconfigsAsync(
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
-			m.downloadWorker(ctx, workerID, taskChan, resultChan)
+			o.downloadWorker(ctx, workerID, taskChan, resultChan)
 		}(i)
 	}
 
@@ -265,7 +263,7 @@ func (m *Manager) downloadKubeconfigsAsync(
 	var errorCount int
 	for result := range resultChan {
 		if result.Error != nil {
-			m.logger.ErrorContext(ctx, "Failed to download kubeconfig",
+			o.logger.ErrorContext(ctx, "Failed to download kubeconfig",
 				"server", result.Task.Server.URL,
 				"cluster", result.Task.Cluster.Name,
 				"error", result.Error)
@@ -275,7 +273,7 @@ func (m *Manager) downloadKubeconfigsAsync(
 		kubeconfigPaths = append(kubeconfigPaths, result.FilePath)
 	}
 
-	m.logger.InfoContext(ctx, "Concurrent downloads completed",
+	o.logger.InfoContext(ctx, "Concurrent downloads completed",
 		"successful", len(kubeconfigPaths),
 		"failed", errorCount,
 		"total", len(downloadTasks))
@@ -291,27 +289,27 @@ func (m *Manager) downloadKubeconfigsAsync(
 }
 
 // downloadWorker processes download tasks from the task channel.
-func (m *Manager) downloadWorker(
+func (o *Orchestrator) downloadWorker(
 	ctx context.Context,
 	workerID int,
 	taskChan <-chan DownloadTask,
 	resultChan chan<- DownloadResult,
 ) {
 	for task := range taskChan {
-		m.logger.DebugContext(ctx, "Worker processing download",
+		o.logger.DebugContext(ctx, "Worker processing download",
 			"worker", workerID,
 			"server", task.Server.URL,
 			"cluster", task.Cluster.Name)
 
-		result := m.downloadKubeconfig(ctx, task)
+		result := o.downloadKubeconfig(ctx, task)
 		resultChan <- result
 	}
 }
 
 // downloadKubeconfig downloads and saves a kubeconfig for a specific cluster.
-func (m *Manager) downloadKubeconfig(ctx context.Context, task DownloadTask) DownloadResult {
+func (o *Orchestrator) downloadKubeconfig(ctx context.Context, task DownloadTask) DownloadResult {
 	// Get kubeconfig for this cluster
-	kubeconfig, err := m.kubeconfigFetcher.GetKubeconfig(ctx, task.Token, task.Server, task.Cluster.ID)
+	kubeconfig, err := o.rancherClient.GetKubeconfig(ctx, task.Token, task.Server, task.Cluster.ID)
 	if err != nil {
 		return DownloadResult{
 			Task:  task,
@@ -323,14 +321,14 @@ func (m *Manager) downloadKubeconfig(ctx context.Context, task DownloadTask) Dow
 	filename := fmt.Sprintf("%s-%s.yaml", task.Cluster.Name, task.Server.ID())
 	path := filepath.Join(task.OutputDir, filename)
 
-	if saveErr := m.kubeconfigWriter.SaveKubeconfig(ctx, path, kubeconfig, task.Server.ID()); saveErr != nil {
+	if saveErr := o.kubeconfigHandler.SaveKubeconfig(ctx, path, kubeconfig, task.Server.ID()); saveErr != nil {
 		return DownloadResult{
 			Task:  task,
 			Error: fmt.Errorf("failed to save kubeconfig: %w", saveErr),
 		}
 	}
 
-	m.logger.DebugContext(ctx, "Successfully downloaded kubeconfig",
+	o.logger.DebugContext(ctx, "Successfully downloaded kubeconfig",
 		"server", task.Server.URL,
 		"cluster", task.Cluster.Name,
 		"path", path)

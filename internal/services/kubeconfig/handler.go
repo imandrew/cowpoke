@@ -20,20 +20,20 @@ const (
 	filePermissions = 0o600 // Read/write owner only
 )
 
-// Manager handles kubeconfig file operations.
-type Manager struct {
+// Handler handles all kubeconfig file operations.
+type Handler struct {
 	fs            domain.FileSystemAdapter
 	kubeconfigDir string
 	logger        *slog.Logger
 }
 
-// NewManager creates a new kubeconfig manager.
-func NewManager(fs domain.FileSystemAdapter, kubeconfigDir string, logger *slog.Logger) (*Manager, error) {
+// NewHandler creates a new kubeconfig handler.
+func NewHandler(fs domain.FileSystemAdapter, kubeconfigDir string, logger *slog.Logger) (*Handler, error) {
 	if err := fs.MkdirAll(kubeconfigDir, dirPermissions); err != nil {
 		return nil, fmt.Errorf("failed to create kubeconfig directory: %w", err)
 	}
 
-	return &Manager{
+	return &Handler{
 		fs:            fs,
 		kubeconfigDir: kubeconfigDir,
 		logger:        logger,
@@ -41,45 +41,45 @@ func NewManager(fs domain.FileSystemAdapter, kubeconfigDir string, logger *slog.
 }
 
 // SaveKubeconfig saves a kubeconfig to a file after preprocessing to avoid conflicts.
-func (m *Manager) SaveKubeconfig(ctx context.Context, path string, content []byte, serverID string) error {
+func (h *Handler) SaveKubeconfig(ctx context.Context, path string, content []byte, serverID string) error {
 	dir := filepath.Dir(path)
-	if err := m.fs.MkdirAll(dir, dirPermissions); err != nil {
+	if err := h.fs.MkdirAll(dir, dirPermissions); err != nil {
 		return fmt.Errorf("failed to create directory for kubeconfig: %w", err)
 	}
 
 	// Preprocess the kubeconfig to append server ID to all resources
-	processedContent, err := m.PreprocessKubeconfig(ctx, content, serverID)
+	processedContent, err := h.PreprocessKubeconfig(ctx, content, serverID)
 	if err != nil {
 		return fmt.Errorf("failed to preprocess kubeconfig: %w", err)
 	}
 
-	if writeErr := m.fs.WriteFile(path, processedContent, filePermissions); writeErr != nil {
+	if writeErr := h.fs.WriteFile(path, processedContent, filePermissions); writeErr != nil {
 		return fmt.Errorf("failed to write kubeconfig file: %w", writeErr)
 	}
 
-	m.logger.DebugContext(ctx, "Kubeconfig saved", "path", path)
+	h.logger.DebugContext(ctx, "Kubeconfig saved", "path", path)
 	return nil
 }
 
 // PreprocessKubeconfig appends server ID to all kubeconfig resources to avoid naming conflicts.
-func (m *Manager) PreprocessKubeconfig(ctx context.Context, content []byte, serverID string) ([]byte, error) {
+func (h *Handler) PreprocessKubeconfig(ctx context.Context, content []byte, serverID string) ([]byte, error) {
 	config, err := clientcmd.Load(content)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse kubeconfig: %w", err)
 	}
 
-	m.logger.DebugContext(ctx, "Preprocessing kubeconfig to append server ID",
+	h.logger.DebugContext(ctx, "Preprocessing kubeconfig to append server ID",
 		"server_id", serverID,
 		"clusters", len(config.Clusters),
 		"contexts", len(config.Contexts),
 		"users", len(config.AuthInfos))
 
 	// Rename resources and track mappings
-	clusterNameMap := m.renameClusters(ctx, config, serverID)
-	userNameMap := m.renameUsers(ctx, config, serverID)
-	contextNameMap := m.renameContexts(ctx, config, serverID, clusterNameMap, userNameMap)
+	clusterNameMap := h.renameClusters(ctx, config, serverID)
+	userNameMap := h.renameUsers(ctx, config, serverID)
+	contextNameMap := h.renameContexts(ctx, config, serverID, clusterNameMap, userNameMap)
 
-	m.logger.InfoContext(ctx, "Kubeconfig preprocessing completed",
+	h.logger.InfoContext(ctx, "Kubeconfig preprocessing completed",
 		"server_id", serverID,
 		"renamed_clusters", len(clusterNameMap),
 		"renamed_users", len(userNameMap),
@@ -89,14 +89,14 @@ func (m *Manager) PreprocessKubeconfig(ctx context.Context, content []byte, serv
 }
 
 // renameClusters renames all clusters by appending server ID and returns name mappings.
-func (m *Manager) renameClusters(ctx context.Context, config *api.Config, serverID string) map[string]string {
+func (h *Handler) renameClusters(ctx context.Context, config *api.Config, serverID string) map[string]string {
 	clusterNameMap := make(map[string]string)
 
 	config.Clusters = maps.Collect(func(yield func(string, *api.Cluster) bool) {
 		for oldName, cluster := range config.Clusters {
 			newName := fmt.Sprintf("%s-%s", oldName, serverID)
 			clusterNameMap[oldName] = newName
-			m.logger.DebugContext(ctx, "Renamed cluster", "old", oldName, "new", newName)
+			h.logger.DebugContext(ctx, "Renamed cluster", "old", oldName, "new", newName)
 			if !yield(newName, cluster) {
 				return
 			}
@@ -107,14 +107,14 @@ func (m *Manager) renameClusters(ctx context.Context, config *api.Config, server
 }
 
 // renameUsers renames all users/auth-infos by appending server ID and returns name mappings.
-func (m *Manager) renameUsers(ctx context.Context, config *api.Config, serverID string) map[string]string {
+func (h *Handler) renameUsers(ctx context.Context, config *api.Config, serverID string) map[string]string {
 	userNameMap := make(map[string]string)
 
 	config.AuthInfos = maps.Collect(func(yield func(string, *api.AuthInfo) bool) {
 		for oldName, authInfo := range config.AuthInfos {
 			newName := fmt.Sprintf("%s-%s", oldName, serverID)
 			userNameMap[oldName] = newName
-			m.logger.DebugContext(ctx, "Renamed user", "old", oldName, "new", newName)
+			h.logger.DebugContext(ctx, "Renamed user", "old", oldName, "new", newName)
 			if !yield(newName, authInfo) {
 				return
 			}
@@ -125,7 +125,7 @@ func (m *Manager) renameUsers(ctx context.Context, config *api.Config, serverID 
 }
 
 // renameContexts renames all contexts, updates their references, and returns name mappings.
-func (m *Manager) renameContexts(
+func (h *Handler) renameContexts(
 	ctx context.Context,
 	config *api.Config,
 	serverID string,
@@ -148,7 +148,7 @@ func (m *Manager) renameContexts(
 			}
 
 			contextNameMap[oldName] = newName
-			m.logger.DebugContext(ctx, "Renamed context", "old", oldName, "new", newName)
+			h.logger.DebugContext(ctx, "Renamed context", "old", oldName, "new", newName)
 			if !yield(newName, context) {
 				return
 			}
@@ -160,12 +160,12 @@ func (m *Manager) renameContexts(
 
 // MergeKubeconfigs merges multiple kubeconfig files into one.
 // All resources should already be renamed with server IDs by preprocessing.
-func (m *Manager) MergeKubeconfigs(ctx context.Context, paths []string, outputPath string) error {
+func (h *Handler) MergeKubeconfigs(ctx context.Context, paths []string, outputPath string) error {
 	if len(paths) == 0 {
 		return errors.New("no kubeconfig paths provided for merging")
 	}
 
-	m.logger.DebugContext(ctx, "Starting kubeconfig merge", "input_count", len(paths))
+	h.logger.DebugContext(ctx, "Starting kubeconfig merge", "input_count", len(paths))
 
 	// Use client-go's built-in merging
 	loadingRules := &clientcmd.ClientConfigLoadingRules{
@@ -183,7 +183,7 @@ func (m *Manager) MergeKubeconfigs(ctx context.Context, paths []string, outputPa
 
 	// Ensure output directory exists with secure permissions
 	outputDir := filepath.Dir(outputPath)
-	if mkdirErr := m.fs.MkdirAll(outputDir, dirPermissions); mkdirErr != nil {
+	if mkdirErr := h.fs.MkdirAll(outputDir, dirPermissions); mkdirErr != nil {
 		return fmt.Errorf("failed to create output directory: %w", mkdirErr)
 	}
 
@@ -192,11 +192,11 @@ func (m *Manager) MergeKubeconfigs(ctx context.Context, paths []string, outputPa
 	}
 
 	// Ensure the output file has secure permissions
-	if chmodErr := m.fs.Chmod(outputPath, filePermissions); chmodErr != nil {
+	if chmodErr := h.fs.Chmod(outputPath, filePermissions); chmodErr != nil {
 		return fmt.Errorf("failed to set secure permissions on output file: %w", chmodErr)
 	}
 
-	m.logger.InfoContext(ctx, "Kubeconfigs merged successfully",
+	h.logger.InfoContext(ctx, "Kubeconfigs merged successfully",
 		"input_count", len(paths),
 		"output", outputPath,
 		"total_clusters", len(mergedConfig.Clusters),
@@ -206,16 +206,16 @@ func (m *Manager) MergeKubeconfigs(ctx context.Context, paths []string, outputPa
 }
 
 // CleanupTempFiles removes temporary kubeconfig files.
-func (m *Manager) CleanupTempFiles(ctx context.Context, paths []string) error {
+func (h *Handler) CleanupTempFiles(ctx context.Context, paths []string) error {
 	var errs []error
 
 	for _, path := range paths {
-		if err := m.fs.Remove(path); err != nil {
+		if err := h.fs.Remove(path); err != nil {
 			if !os.IsNotExist(err) {
 				errs = append(errs, fmt.Errorf("failed to remove %s: %w", path, err))
 			}
 		} else {
-			m.logger.DebugContext(ctx, "Cleaned up temporary kubeconfig", "path", path)
+			h.logger.DebugContext(ctx, "Cleaned up temporary kubeconfig", "path", path)
 		}
 	}
 

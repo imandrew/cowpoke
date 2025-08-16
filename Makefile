@@ -1,4 +1,4 @@
-.PHONY: lint lint-check test build clean install goreleaser-build goreleaser-check help
+.PHONY: lint lint-check test build clean install goreleaser-build goreleaser-check mocks help
 
 # Default target
 all: lint test build
@@ -13,7 +13,7 @@ lint-check:
 
 # Testing
 test:
-	go test -v -race -coverprofile=coverage.out ./...
+	go test -v -race ./...
 
 # Build the binary
 build:
@@ -37,6 +37,11 @@ goreleaser-build:
 goreleaser-check:
 	goreleaser check
 
+# Generate mocks for testing
+mocks:
+	rm -f internal/mocks/*.go
+	mockery
+
 # Show help
 help:
 	@echo "Available targets:"
@@ -49,4 +54,5 @@ help:
 	@echo "  install          - Install/update dependencies"
 	@echo "  goreleaser-build - Build with goreleaser (snapshot)"
 	@echo "  goreleaser-check - Check goreleaser configuration"
+	@echo "  mocks            - Generate test mocks with mockery"
 	@echo "  help             - Show this help message"

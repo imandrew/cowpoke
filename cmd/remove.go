@@ -27,17 +27,14 @@ func init() {
 }
 
 func runRemove(cmd *cobra.Command, _ []string) error {
-	// Get the initialized app instance
 	app := GetApp()
 	if app == nil {
 		return errors.New("application not initialized")
 	}
 
-	// Extract flags
 	removeURL, _ := cmd.Flags().GetString("url")
 	removeID, _ := cmd.Flags().GetString("id")
 
-	// Validate that exactly one flag is provided
 	if removeURL == "" && removeID == "" {
 		return errors.New("either --url or --id must be specified")
 	}
@@ -45,13 +42,11 @@ func runRemove(cmd *cobra.Command, _ []string) error {
 		return errors.New("only one of --url or --id can be specified")
 	}
 
-	// Create remove command with injected dependencies
 	removeCommand := commands.NewRemoveCommand(
 		app.ConfigRepo,
 		app.Logger,
 	)
 
-	// Execute the remove command
 	err := removeCommand.Execute(context.Background(), commands.RemoveRequest{
 		ServerURL: removeURL,
 		ServerID:  removeID,
@@ -59,8 +54,6 @@ func runRemove(cmd *cobra.Command, _ []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to remove server: %w", err)
 	}
-
-	// Display appropriate success message
 	if removeURL != "" {
 		fmt.Fprintf(cmd.OutOrStdout(), "Successfully removed Rancher server: %s\n", removeURL)
 	} else {

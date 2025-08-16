@@ -72,7 +72,7 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Global flags
+	// Global flags.
 	rootCmd.PersistentFlags().
 		StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/cowpoke/config.yaml)")
 	rootCmd.PersistentFlags().
@@ -93,10 +93,10 @@ func initConfig() {
 
 	viper.AutomaticEnv()
 
-	// Read config file silently (ignore error if config file doesn't exist)
+	// Read config file silently (ignore error if config file doesn't exist).
 	_ = viper.ReadInConfig()
 
-	// Initialize the application with dependency injection
+	// Initialize the application with dependency injection.
 	var opts []app.Option
 	if verbose {
 		opts = append(opts, app.WithVerbose(true))

@@ -15,7 +15,7 @@ var (
 )
 
 func main() {
-	// Set version information that can be used by the CLI
+	// Set version information that can be used by the CLI.
 	cmd.SetVersionInfo(version, commit, date, builtBy)
 	cmd.Execute()
 }

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"cowpoke/internal/domain"
+	"cowpoke/internal/services/filter"
 )
 
 // SyncCommand handles syncing kubeconfigs from Rancher servers.
@@ -38,13 +39,15 @@ type SyncRequest struct {
 	InsecureSkipTLS  bool
 	CleanupTempFiles bool
 	Verbose          bool
+	ExcludePatterns  []string
 }
 
-// Execute runs the sync command using the SyncManager for concurrent processing.
+// Execute runs the sync command using the SyncOrchestrator for concurrent processing.
 func (c *SyncCommand) Execute(
 	ctx context.Context,
 	req SyncRequest,
-	rancherServices domain.RancherServices,
+	syncOrchestrator domain.SyncOrchestrator,
+	kubeconfigHandler domain.KubeconfigHandler,
 ) error {
 	servers, err := c.configRepo.GetServers(ctx)
 	if err != nil {
@@ -64,8 +67,20 @@ func (c *SyncCommand) Execute(
 		return fmt.Errorf("failed to collect passwords: %w", err)
 	}
 
-	// Use KubeconfigSyncer for concurrent processing
-	allKubeconfigPaths, err := rancherServices.KubeconfigSyncer.SyncAllServers(ctx, servers, passwords)
+	// Create cluster filter based on exclude patterns
+	var clusterFilter domain.ClusterFilter
+	if len(req.ExcludePatterns) > 0 {
+		excludeFilter, filterErr := filter.NewExcludeFilter(req.ExcludePatterns, c.logger)
+		if filterErr != nil {
+			return fmt.Errorf("failed to create exclude filter: %w", filterErr)
+		}
+		clusterFilter = excludeFilter
+	} else {
+		clusterFilter = filter.NewNoOpFilter()
+	}
+
+	// Use SyncOrchestrator for concurrent processing
+	allKubeconfigPaths, err := syncOrchestrator.SyncServers(ctx, servers, passwords, clusterFilter)
 	if err != nil {
 		return fmt.Errorf("concurrent sync failed: %w", err)
 	}
@@ -88,13 +103,13 @@ func (c *SyncCommand) Execute(
 		"count", len(allKubeconfigPaths),
 		"output", outputPath)
 
-	if mergeErr := rancherServices.KubeconfigMerger.MergeKubeconfigs(ctx, allKubeconfigPaths, outputPath); mergeErr != nil {
+	if mergeErr := kubeconfigHandler.MergeKubeconfigs(ctx, allKubeconfigPaths, outputPath); mergeErr != nil {
 		return fmt.Errorf("failed to merge kubeconfigs: %w", mergeErr)
 	}
 
 	// Cleanup temporary files if requested
 	if req.CleanupTempFiles {
-		if cleanupErr := rancherServices.KubeconfigCleaner.CleanupTempFiles(ctx, allKubeconfigPaths); cleanupErr != nil {
+		if cleanupErr := kubeconfigHandler.CleanupTempFiles(ctx, allKubeconfigPaths); cleanupErr != nil {
 			c.logger.WarnContext(ctx, "Failed to cleanup some temporary files", "error", cleanupErr)
 		}
 	}

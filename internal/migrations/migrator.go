@@ -36,7 +36,7 @@ func (m *Migrator) Migrate(
 	data []byte,
 	currentVersion string,
 ) ([]domain.ConfigServer, bool, error) {
-	// First try to detect the version
+	// First try to detect the version.
 	version, err := m.detectVersion(data)
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to detect config version: %w", err)
@@ -44,12 +44,12 @@ func (m *Migrator) Migrate(
 
 	m.logger.DebugContext(ctx, "Detected configuration version", "version", version, "current", currentVersion)
 
-	// If already current version, no migration needed
+	// If already current version, no migration needed.
 	if version == currentVersion {
 		return nil, false, nil
 	}
 
-	// Handle migration based on detected version
+	// Handle migration based on detected version.
 	switch version {
 	case "", "1.0":
 		return m.migrateFromV1(ctx, data)
@@ -68,7 +68,7 @@ func (m *Migrator) detectVersion(data []byte) (string, error) {
 		return "", err
 	}
 
-	// Empty version indicates v1.0 or earlier
+	// Empty version indicates v1.0 or earlier.
 	if versionCheck.Version == "" {
 		return "1.0", nil
 	}
@@ -100,14 +100,14 @@ func (m *Migrator) FixPermissionsPostMigration(
 		filePermissions = 0o600 // Read/write owner only
 	)
 
-	// Fix config file permissions
+	// Fix config file permissions.
 	if err := fs.Chmod(configPath, filePermissions); err != nil {
 		m.logger.WarnContext(ctx, "Failed to fix config file permissions",
 			"path", configPath, "error", err)
 		return fmt.Errorf("failed to fix config file permissions: %w", err)
 	}
 
-	// Fix config directory permissions
+	// Fix config directory permissions.
 	configDir := filepath.Dir(configPath)
 	if err := fs.Chmod(configDir, dirPermissions); err != nil {
 		m.logger.WarnContext(ctx, "Failed to fix config directory permissions",
@@ -115,19 +115,19 @@ func (m *Migrator) FixPermissionsPostMigration(
 		return fmt.Errorf("failed to fix config directory permissions: %w", err)
 	}
 
-	// Fix kubeconfig directory permissions if it exists
-	// This handles the case where users had ~/.kube or other kubeconfig dirs from v1.x
+	// Fix kubeconfig directory permissions if it exists.
+	// This handles the case where users had ~/.kube or other kubeconfig dirs from v1.x.
 	kubeconfigDirs := []string{
 		filepath.Join(filepath.Dir(configDir), "..", ".kube"), // ~/.kube if config is in ~/.config/cowpoke
 	}
 
 	for _, kubeconfigDir := range kubeconfigDirs {
-		// Only fix permissions if directory exists (don't create it)
+		// Only fix permissions if directory exists (don't create it).
 		if _, err := fs.Stat(kubeconfigDir); err == nil {
 			if chmodErr := fs.Chmod(kubeconfigDir, dirPermissions); chmodErr != nil {
 				m.logger.WarnContext(ctx, "Failed to fix kubeconfig directory permissions",
 					"path", kubeconfigDir, "error", chmodErr)
-				// Don't fail the migration for kubeconfig directory permission issues
+				// Don't fail the migration for kubeconfig directory permission issues.
 			} else {
 				m.logger.InfoContext(ctx, "Fixed kubeconfig directory permissions",
 					"path", kubeconfigDir)

@@ -29,14 +29,14 @@ func migrateFromV1(data []byte) ([]domain.ConfigServer, error) {
 		return nil, err
 	}
 
-	// Convert v1 servers to v2 format
+	// Convert v1 servers to v2 format.
 	servers := make([]domain.ConfigServer, len(v1Config.Servers))
 	for i, v1Server := range v1Config.Servers {
 		servers[i] = domain.ConfigServer{
 			URL:      v1Server.URL,
 			Username: v1Server.Username,
 			AuthType: v1Server.AuthType,
-			// Note: ID and Name fields are dropped - v2 uses dynamic ID generation
+			// Note: ID and Name fields are dropped - v2 uses dynamic ID generation.
 		}
 	}
 

@@ -24,19 +24,16 @@ func init() {
 }
 
 func runList(cmd *cobra.Command, _ []string) error {
-	// Get the initialized app instance
 	app := GetApp()
 	if app == nil {
 		return errors.New("application not initialized")
 	}
 
-	// Create list command with injected dependencies
 	listCommand := commands.NewListCommand(
 		app.ConfigRepo,
 		app.Logger,
 	)
 
-	// Execute the list command
 	result, err := listCommand.Execute(context.Background(), commands.ListRequest{})
 	if err != nil {
 		return fmt.Errorf("failed to list servers: %w", err)

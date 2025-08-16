@@ -33,7 +33,7 @@ type ConfigServer struct {
 
 // ID returns a deterministic 8-character ID generated from the server domain.
 func (cs *ConfigServer) ID() string {
-	// Extract the domain part from the URL
+	// Extract the domain part from the URL.
 	domain := cs.extractDomain()
 	hash := sha256.Sum256([]byte(domain))
 	return hex.EncodeToString(hash[:])[:8]
@@ -43,13 +43,13 @@ func (cs *ConfigServer) ID() string {
 func (cs *ConfigServer) extractDomain() string {
 	parsedURL, err := url.Parse(cs.URL)
 	if err != nil {
-		// Fallback to raw URL if parsing fails
+		// Fallback to raw URL if parsing fails.
 		return cs.URL
 	}
 
 	hostname := parsedURL.Hostname()
 	if hostname == "" {
-		// Fallback to raw URL if no hostname found
+		// Fallback to raw URL if no hostname found.
 		return cs.URL
 	}
 

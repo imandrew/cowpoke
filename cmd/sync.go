@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"cowpoke/internal/commands"
-	"cowpoke/internal/domain"
 
 	"github.com/spf13/cobra"
 )
@@ -36,29 +35,24 @@ func init() {
 		Bool("cleanup-temp-files", false, "Remove temporary kubeconfig files after merging")
 	syncCmd.Flags().
 		Bool("insecure", false, "Skip TLS certificate verification for Rancher servers")
+	syncCmd.Flags().
+		StringSlice("exclude", []string{}, "Exclude clusters matching regex pattern (can be specified multiple times)")
 }
 
 func runSync(cmd *cobra.Command, _ []string) error {
-	// Get the initialized app instance
 	app := GetApp()
 	if app == nil {
 		return errors.New("application not initialized")
 	}
 
-	// Extract flags
 	output, _ := cmd.Flags().GetString("output")
 	cleanupTempFiles, _ := cmd.Flags().GetBool("cleanup-temp-files")
 	insecureSkipTLS, _ := cmd.Flags().GetBool("insecure")
+	excludePatterns, _ := cmd.Flags().GetStringSlice("exclude")
 
-	// Create Rancher services with appropriate TLS configuration
-	var rancherServices domain.RancherServices
-	if insecureSkipTLS {
-		rancherServices = app.RancherServiceFactory.CreateInsecureServices(app.ConfigProvider)
-	} else {
-		rancherServices = app.RancherServiceFactory.CreateSecureServices(app.ConfigProvider)
-	}
+	rancherClient := app.CreateRancherClient(insecureSkipTLS)
+	syncOrchestrator := app.CreateSyncOrchestrator(rancherClient)
 
-	// Create sync command with simplified dependencies
 	syncCommand := commands.NewSyncCommand(
 		app.ConfigRepo,
 		app.ConfigProvider,
@@ -66,17 +60,15 @@ func runSync(cmd *cobra.Command, _ []string) error {
 		app.Logger,
 	)
 
-	// Execute with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), syncTimeout)
 	defer cancel()
-
-	// Execute the sync command with RancherServices
 	err := syncCommand.Execute(ctx, commands.SyncRequest{
 		Output:           output,
 		InsecureSkipTLS:  insecureSkipTLS,
 		CleanupTempFiles: cleanupTempFiles,
 		Verbose:          app.Config.Verbose,
-	}, rancherServices)
+		ExcludePatterns:  excludePatterns,
+	}, syncOrchestrator, app.KubeconfigHandler)
 	if err != nil {
 		return fmt.Errorf("sync failed: %w", err)
 	}

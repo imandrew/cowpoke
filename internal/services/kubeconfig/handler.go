@@ -79,7 +79,7 @@ func (h *Handler) PreprocessKubeconfig(ctx context.Context, content []byte, serv
 	userNameMap := h.renameUsers(ctx, config, serverID)
 	contextNameMap := h.renameContexts(ctx, config, serverID, clusterNameMap, userNameMap)
 
-	h.logger.InfoContext(ctx, "Kubeconfig preprocessing completed",
+	h.logger.DebugContext(ctx, "Kubeconfig preprocessing completed",
 		"server_id", serverID,
 		"renamed_clusters", len(clusterNameMap),
 		"renamed_users", len(userNameMap),
@@ -158,27 +158,81 @@ func (h *Handler) renameContexts(
 	return contextNameMap
 }
 
-// MergeKubeconfigs merges multiple kubeconfig files into one.
-// All resources should already be renamed with server IDs by preprocessing.
-func (h *Handler) MergeKubeconfigs(ctx context.Context, paths []string, outputPath string) error {
+// MergeKubeconfigs merges multiple kubeconfig files into one, applying cluster filtering.
+// Resources are preprocessed with server IDs to avoid conflicts.
+// Filtering is applied at kubeconfig level to handle multi-cluster Rancher files.
+func (h *Handler) MergeKubeconfigs(
+	ctx context.Context,
+	paths []string,
+	outputPath string,
+	filter domain.ClusterFilter,
+) error {
 	if len(paths) == 0 {
 		return errors.New("no kubeconfig paths provided for merging")
 	}
 
-	h.logger.DebugContext(ctx, "Starting kubeconfig merge", "input_count", len(paths))
+	h.logger.DebugContext(ctx, "Starting kubeconfig merge with filtering",
+		"input_count", len(paths),
+		"filter_type", fmt.Sprintf("%T", filter))
 
-	// Use client-go's built-in merging
-	loadingRules := &clientcmd.ClientConfigLoadingRules{
-		Precedence: paths,
+	mergedConfig := &api.Config{
+		Clusters:  make(map[string]*api.Cluster),
+		Contexts:  make(map[string]*api.Context),
+		AuthInfos: make(map[string]*api.AuthInfo),
 	}
 
-	mergedConfig, err := loadingRules.Load()
-	if err != nil {
-		return fmt.Errorf("failed to merge kubeconfigs: %w", err)
+	var totalOriginalContexts int
+	var totalFilteredContexts int
+	var excludedContexts int
+
+	for _, path := range paths {
+		config, err := h.loadAndFilterKubeconfig(ctx, path, filter)
+		if err != nil {
+			h.logger.WarnContext(ctx, "Failed to load or filter kubeconfig, skipping",
+				"path", path,
+				"error", err)
+			continue
+		}
+
+		if config == nil {
+			// Completely filtered out
+			continue
+		}
+
+		originalContextCount := len(config.Contexts)
+		totalOriginalContexts += originalContextCount
+
+		// Apply filtering to this kubeconfig
+		filteredConfig := h.applyFilterToConfig(ctx, config, filter)
+		if filteredConfig == nil {
+			h.logger.DebugContext(ctx, "All contexts filtered out from kubeconfig",
+				"path", path,
+				"original_contexts", originalContextCount)
+			excludedContexts += originalContextCount
+			continue
+		}
+
+		filteredContextCount := len(filteredConfig.Contexts)
+		totalFilteredContexts += filteredContextCount
+		excludedContexts += originalContextCount - filteredContextCount
+
+		h.logger.DebugContext(ctx, "Kubeconfig processed",
+			"path", path,
+			"original_contexts", originalContextCount,
+			"filtered_contexts", filteredContextCount,
+			"excluded_contexts", originalContextCount-filteredContextCount)
+
+		// Merge filtered config into the accumulated result
+		h.mergeConfigInto(mergedConfig, filteredConfig)
 	}
 
 	if len(mergedConfig.Clusters) == 0 {
-		return errors.New("no valid clusters found in merged kubeconfig")
+		if excludedContexts > 0 {
+			h.logger.InfoContext(ctx, "All contexts excluded by filters",
+				"excluded_contexts", excludedContexts)
+			return errors.New("all clusters were excluded by filters - no kubeconfig to write")
+		}
+		return errors.New("no valid clusters found after filtering")
 	}
 
 	// Ensure output directory exists with secure permissions
@@ -196,13 +250,118 @@ func (h *Handler) MergeKubeconfigs(ctx context.Context, paths []string, outputPa
 		return fmt.Errorf("failed to set secure permissions on output file: %w", chmodErr)
 	}
 
-	h.logger.InfoContext(ctx, "Kubeconfigs merged successfully",
-		"input_count", len(paths),
-		"output", outputPath,
-		"total_clusters", len(mergedConfig.Clusters),
-		"total_contexts", len(mergedConfig.Contexts))
+	h.logger.InfoContext(ctx, "Merged kubeconfigs successfully",
+		"contexts", len(mergedConfig.Contexts),
+		"excluded", excludedContexts,
+		"output", outputPath)
 
 	return nil
+}
+
+// loadAndFilterKubeconfig loads a kubeconfig file from disk.
+func (h *Handler) loadAndFilterKubeconfig(
+	ctx context.Context,
+	path string,
+	_ domain.ClusterFilter,
+) (*api.Config, error) {
+	h.logger.DebugContext(ctx, "Loading kubeconfig for filtering", "path", path)
+
+	// Read the kubeconfig file
+	data, err := h.fs.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read kubeconfig file %s: %w", path, err)
+	}
+
+	// Parse the kubeconfig
+	config, err := clientcmd.Load(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse kubeconfig %s: %w", path, err)
+	}
+
+	return config, nil
+}
+
+// applyFilterToConfig applies the cluster filter to a kubeconfig, removing excluded contexts and cleaning up unused resources.
+func (h *Handler) applyFilterToConfig(
+	ctx context.Context,
+	config *api.Config,
+	filter domain.ClusterFilter,
+) *api.Config {
+	if filter == nil {
+		h.logger.DebugContext(ctx, "No filter provided, keeping all contexts")
+		return config
+	}
+
+	filteredConfig := &api.Config{
+		Clusters:  make(map[string]*api.Cluster),
+		Contexts:  make(map[string]*api.Context),
+		AuthInfos: make(map[string]*api.AuthInfo),
+	}
+
+	usedClusters := make(map[string]bool)
+	usedAuthInfos := make(map[string]bool)
+
+	for contextName, context := range config.Contexts {
+		// Filter by both context name and cluster name
+		shouldExcludeContext := filter.ShouldExclude(contextName)
+		shouldExcludeCluster := filter.ShouldExclude(context.Cluster)
+
+		if shouldExcludeContext || shouldExcludeCluster {
+			h.logger.DebugContext(ctx, "Excluding context",
+				"context", fmt.Sprintf("%q", contextName),
+				"cluster", fmt.Sprintf("%q", context.Cluster),
+				"by_context", shouldExcludeContext,
+				"by_cluster", shouldExcludeCluster)
+			continue
+		}
+
+		h.logger.DebugContext(ctx, "Including context",
+			"context", fmt.Sprintf("%q", contextName),
+			"cluster", fmt.Sprintf("%q", context.Cluster))
+
+		filteredConfig.Contexts[contextName] = context
+		usedClusters[context.Cluster] = true
+		usedAuthInfos[context.AuthInfo] = true
+	}
+
+	// Only keep clusters that are referenced by remaining contexts
+	for clusterName, cluster := range config.Clusters {
+		if usedClusters[clusterName] {
+			filteredConfig.Clusters[clusterName] = cluster
+		}
+	}
+
+	// Only keep authInfos that are referenced by remaining contexts
+	for authInfoName, authInfo := range config.AuthInfos {
+		if usedAuthInfos[authInfoName] {
+			filteredConfig.AuthInfos[authInfoName] = authInfo
+		}
+	}
+
+	// If no contexts remain, return nil
+	if len(filteredConfig.Contexts) == 0 {
+		return nil
+	}
+
+	return filteredConfig
+}
+
+// mergeConfigInto merges the source config into the destination config.
+func (h *Handler) mergeConfigInto(dest, src *api.Config) {
+	// Merge clusters
+	for name, cluster := range src.Clusters {
+		dest.Clusters[name] = cluster
+	}
+
+	// Merge contexts
+	for name, context := range src.Contexts {
+		dest.Contexts[name] = context
+	}
+
+	// Merge authInfos
+	for name, authInfo := range src.AuthInfos {
+		dest.AuthInfos[name] = authInfo
+	}
 }
 
 // CleanupTempFiles removes temporary kubeconfig files.

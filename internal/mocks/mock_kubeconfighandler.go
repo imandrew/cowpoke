@@ -6,6 +6,7 @@ package mocks
 
 import (
 	"context"
+	"cowpoke/internal/domain"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -95,16 +96,16 @@ func (_c *MockKubeconfigHandler_CleanupTempFiles_Call) RunAndReturn(run func(ctx
 }
 
 // MergeKubeconfigs provides a mock function for the type MockKubeconfigHandler
-func (_mock *MockKubeconfigHandler) MergeKubeconfigs(ctx context.Context, paths []string, outputPath string) error {
-	ret := _mock.Called(ctx, paths, outputPath)
+func (_mock *MockKubeconfigHandler) MergeKubeconfigs(ctx context.Context, paths []string, outputPath string, filter domain.ClusterFilter) error {
+	ret := _mock.Called(ctx, paths, outputPath, filter)
 
 	if len(ret) == 0 {
 		panic("no return value specified for MergeKubeconfigs")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, []string, string) error); ok {
-		r0 = returnFunc(ctx, paths, outputPath)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []string, string, domain.ClusterFilter) error); ok {
+		r0 = returnFunc(ctx, paths, outputPath, filter)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -120,11 +121,12 @@ type MockKubeconfigHandler_MergeKubeconfigs_Call struct {
 //   - ctx context.Context
 //   - paths []string
 //   - outputPath string
-func (_e *MockKubeconfigHandler_Expecter) MergeKubeconfigs(ctx interface{}, paths interface{}, outputPath interface{}) *MockKubeconfigHandler_MergeKubeconfigs_Call {
-	return &MockKubeconfigHandler_MergeKubeconfigs_Call{Call: _e.mock.On("MergeKubeconfigs", ctx, paths, outputPath)}
+//   - filter domain.ClusterFilter
+func (_e *MockKubeconfigHandler_Expecter) MergeKubeconfigs(ctx interface{}, paths interface{}, outputPath interface{}, filter interface{}) *MockKubeconfigHandler_MergeKubeconfigs_Call {
+	return &MockKubeconfigHandler_MergeKubeconfigs_Call{Call: _e.mock.On("MergeKubeconfigs", ctx, paths, outputPath, filter)}
 }
 
-func (_c *MockKubeconfigHandler_MergeKubeconfigs_Call) Run(run func(ctx context.Context, paths []string, outputPath string)) *MockKubeconfigHandler_MergeKubeconfigs_Call {
+func (_c *MockKubeconfigHandler_MergeKubeconfigs_Call) Run(run func(ctx context.Context, paths []string, outputPath string, filter domain.ClusterFilter)) *MockKubeconfigHandler_MergeKubeconfigs_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -138,10 +140,15 @@ func (_c *MockKubeconfigHandler_MergeKubeconfigs_Call) Run(run func(ctx context.
 		if args[2] != nil {
 			arg2 = args[2].(string)
 		}
+		var arg3 domain.ClusterFilter
+		if args[3] != nil {
+			arg3 = args[3].(domain.ClusterFilter)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -152,7 +159,7 @@ func (_c *MockKubeconfigHandler_MergeKubeconfigs_Call) Return(err error) *MockKu
 	return _c
 }
 
-func (_c *MockKubeconfigHandler_MergeKubeconfigs_Call) RunAndReturn(run func(ctx context.Context, paths []string, outputPath string) error) *MockKubeconfigHandler_MergeKubeconfigs_Call {
+func (_c *MockKubeconfigHandler_MergeKubeconfigs_Call) RunAndReturn(run func(ctx context.Context, paths []string, outputPath string, filter domain.ClusterFilter) error) *MockKubeconfigHandler_MergeKubeconfigs_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -19,8 +19,9 @@ type KubeconfigHandler interface {
 	// SaveKubeconfig saves a kubeconfig to a file after preprocessing to avoid conflicts.
 	SaveKubeconfig(ctx context.Context, path string, content []byte, serverID string) error
 
-	// MergeKubeconfigs merges multiple kubeconfig files into one.
-	MergeKubeconfigs(ctx context.Context, paths []string, outputPath string) error
+	// MergeKubeconfigs merges multiple kubeconfig files into one, applying cluster filtering.
+	// The filter is applied to context and cluster names within each kubeconfig before merging.
+	MergeKubeconfigs(ctx context.Context, paths []string, outputPath string, filter ClusterFilter) error
 
 	// CleanupTempFiles removes temporary kubeconfig files.
 	CleanupTempFiles(ctx context.Context, paths []string) error
@@ -29,11 +30,11 @@ type KubeconfigHandler interface {
 // SyncOrchestrator orchestrates the entire kubeconfig synchronization process.
 type SyncOrchestrator interface {
 	// SyncServers performs concurrent discovery and download of kubeconfigs from the provided servers.
-	// Returns paths to downloaded kubeconfig files ready for merging.
+	// Returns a SyncResult containing paths to downloaded kubeconfig files and statistics.
+	// Filtering is now handled at the kubeconfig merge level, not during download.
 	SyncServers(
 		ctx context.Context,
 		servers []ConfigServer,
 		passwords map[string]string,
-		filter ClusterFilter,
-	) ([]string, error)
+	) (*SyncResult, error)
 }

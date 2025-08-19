@@ -36,13 +36,26 @@ func NewExcludeFilter(patterns []string, logger *slog.Logger) (*ExcludeFilter, e
 
 // ShouldExclude returns true if the cluster name matches any exclude pattern.
 func (f *ExcludeFilter) ShouldExclude(clusterName string) bool {
-	for _, pattern := range f.patterns {
-		if pattern.MatchString(clusterName) {
-			f.logger.Debug("Cluster matches exclude pattern",
-				"cluster", clusterName,
-				"pattern", pattern.String())
+	f.logger.Info("Checking cluster against exclude patterns",
+		"cluster", fmt.Sprintf("%q", clusterName),
+		"pattern_count", len(f.patterns))
+
+	for i, pattern := range f.patterns {
+		matches := pattern.MatchString(clusterName)
+		f.logger.Info("Pattern evaluation",
+			"cluster", fmt.Sprintf("%q", clusterName),
+			"pattern", fmt.Sprintf("%q", pattern.String()),
+			"pattern_index", i,
+			"matches", matches)
+		if matches {
+			f.logger.Info("MATCH FOUND - cluster will be excluded",
+				"cluster", fmt.Sprintf("%q", clusterName),
+				"matched_pattern", fmt.Sprintf("%q", pattern.String()))
 			return true
 		}
 	}
+
+	f.logger.Info("No patterns matched - cluster will be included",
+		"cluster", fmt.Sprintf("%q", clusterName))
 	return false
 }

@@ -50,6 +50,15 @@ func runSync(cmd *cobra.Command, _ []string) error {
 	insecureSkipTLS, _ := cmd.Flags().GetBool("insecure")
 	excludePatterns, _ := cmd.Flags().GetStringSlice("exclude")
 
+	// Debug logging for exclude patterns
+	if len(excludePatterns) > 0 {
+		app.Logger.Info("Exclude patterns received from CLI",
+			"patterns", excludePatterns,
+			"count", len(excludePatterns))
+	} else {
+		app.Logger.Info("No exclude patterns specified")
+	}
+
 	rancherClient := app.CreateRancherClient(insecureSkipTLS)
 	syncOrchestrator := app.CreateSyncOrchestrator(rancherClient)
 

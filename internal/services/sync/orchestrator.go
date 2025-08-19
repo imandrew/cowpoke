@@ -72,25 +72,25 @@ func (o *Orchestrator) SyncServers(
 	ctx context.Context,
 	servers []domain.ConfigServer,
 	passwords map[string]string,
-	filter domain.ClusterFilter,
-) ([]string, error) {
+) (*domain.SyncResult, error) {
 	if len(servers) == 0 {
-		return nil, nil
+		return &domain.SyncResult{}, nil
 	}
 
-	o.logger.InfoContext(ctx, "Starting concurrent sync",
-		"servers", len(servers),
-		"maxConcurrentDownloads", maxConcurrentDownloads)
+	o.logger.InfoContext(ctx, "Starting sync",
+		"servers", len(servers))
 
 	// Phase 1: Concurrent cluster discovery
-	downloadTasks, err := o.discoverClustersAsync(ctx, servers, passwords, filter)
+	downloadTasks, totalClustersFound, err := o.discoverClustersAsync(ctx, servers, passwords)
 	if err != nil {
 		return nil, fmt.Errorf("cluster discovery failed: %w", err)
 	}
 
 	if len(downloadTasks) == 0 {
 		o.logger.WarnContext(ctx, "No clusters discovered from any server")
-		return nil, nil
+		return &domain.SyncResult{
+			TotalClustersFound: totalClustersFound,
+		}, nil
 	}
 
 	// Phase 2: Concurrent kubeconfig downloads
@@ -99,12 +99,14 @@ func (o *Orchestrator) SyncServers(
 		return nil, fmt.Errorf("kubeconfig downloads failed: %w", err)
 	}
 
-	o.logger.InfoContext(ctx, "Concurrent sync completed",
-		"servers", len(servers),
-		"clusters", len(downloadTasks),
-		"kubeconfigs", len(kubeconfigPaths))
+	o.logger.InfoContext(ctx, "Downloaded kubeconfigs",
+		"kubeconfigs", len(kubeconfigPaths),
+		"clusters", len(downloadTasks))
 
-	return kubeconfigPaths, nil
+	return &domain.SyncResult{
+		KubeconfigPaths:    kubeconfigPaths,
+		TotalClustersFound: totalClustersFound,
+	}, nil
 }
 
 // discoverClustersAsync performs concurrent authentication and cluster discovery.
@@ -112,8 +114,7 @@ func (o *Orchestrator) discoverClustersAsync(
 	ctx context.Context,
 	servers []domain.ConfigServer,
 	passwords map[string]string,
-	filter domain.ClusterFilter,
-) ([]DownloadTask, error) {
+) ([]DownloadTask, int, error) {
 	// Create discovery tasks
 	discoveryTasks := make([]DiscoveryTask, 0, len(servers))
 	for _, server := range servers {
@@ -147,11 +148,12 @@ func (o *Orchestrator) discoverClustersAsync(
 	// Get kubeconfig directory for download tasks
 	kubeconfigDir, err := o.configProvider.GetKubeconfigDir()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get kubeconfig directory: %w", err)
+		return nil, 0, fmt.Errorf("failed to get kubeconfig directory: %w", err)
 	}
 
 	// Collect results and build download tasks
 	var downloadTasks []DownloadTask
+	var totalClustersFound int
 	for result := range resultChan {
 		if result.Error != nil {
 			o.logger.ErrorContext(ctx, "Failed to discover clusters for server",
@@ -161,13 +163,13 @@ func (o *Orchestrator) discoverClustersAsync(
 		}
 
 		for _, cluster := range result.Clusters {
-			// Apply filter to exclude clusters
-			if filter.ShouldExclude(cluster.Name) {
-				o.logger.DebugContext(ctx, "Excluding cluster",
-					"cluster", cluster.Name,
-					"server", result.Server.URL)
-				continue
-			}
+			totalClustersFound++
+
+			// All clusters downloaded; filtering happens at merge level
+			o.logger.DebugContext(ctx, "Discovered cluster",
+				"cluster", fmt.Sprintf("%q", cluster.Name),
+				"server", result.Server.URL,
+				"cluster_id", cluster.ID)
 
 			downloadTasks = append(downloadTasks, DownloadTask{
 				Server:    result.Server,
@@ -178,7 +180,7 @@ func (o *Orchestrator) discoverClustersAsync(
 		}
 	}
 
-	return downloadTasks, nil
+	return downloadTasks, totalClustersFound, nil
 }
 
 // discoverClustersForServer authenticates with a server and discovers its clusters.
@@ -187,7 +189,7 @@ func (o *Orchestrator) discoverClustersForServer(
 	task DiscoveryTask,
 	resultChan chan<- DiscoveryResult,
 ) {
-	o.logger.InfoContext(ctx, "Discovering clusters for server", "server", task.Server.URL)
+	o.logger.DebugContext(ctx, "Discovering clusters for server", "server", task.Server.URL)
 
 	// Authenticate with the server
 	token, err := o.rancherClient.Authenticate(ctx, task.Server, task.Password)

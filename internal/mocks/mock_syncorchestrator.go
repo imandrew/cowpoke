@@ -39,27 +39,27 @@ func (_m *MockSyncOrchestrator) EXPECT() *MockSyncOrchestrator_Expecter {
 }
 
 // SyncServers provides a mock function for the type MockSyncOrchestrator
-func (_mock *MockSyncOrchestrator) SyncServers(ctx context.Context, servers []domain.ConfigServer, passwords map[string]string, filter domain.ClusterFilter) ([]string, error) {
-	ret := _mock.Called(ctx, servers, passwords, filter)
+func (_mock *MockSyncOrchestrator) SyncServers(ctx context.Context, servers []domain.ConfigServer, passwords map[string]string) (*domain.SyncResult, error) {
+	ret := _mock.Called(ctx, servers, passwords)
 
 	if len(ret) == 0 {
 		panic("no return value specified for SyncServers")
 	}
 
-	var r0 []string
+	var r0 *domain.SyncResult
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, []domain.ConfigServer, map[string]string, domain.ClusterFilter) ([]string, error)); ok {
-		return returnFunc(ctx, servers, passwords, filter)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []domain.ConfigServer, map[string]string) (*domain.SyncResult, error)); ok {
+		return returnFunc(ctx, servers, passwords)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, []domain.ConfigServer, map[string]string, domain.ClusterFilter) []string); ok {
-		r0 = returnFunc(ctx, servers, passwords, filter)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []domain.ConfigServer, map[string]string) *domain.SyncResult); ok {
+		r0 = returnFunc(ctx, servers, passwords)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
+			r0 = ret.Get(0).(*domain.SyncResult)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, []domain.ConfigServer, map[string]string, domain.ClusterFilter) error); ok {
-		r1 = returnFunc(ctx, servers, passwords, filter)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []domain.ConfigServer, map[string]string) error); ok {
+		r1 = returnFunc(ctx, servers, passwords)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -75,12 +75,11 @@ type MockSyncOrchestrator_SyncServers_Call struct {
 //   - ctx context.Context
 //   - servers []domain.ConfigServer
 //   - passwords map[string]string
-//   - filter domain.ClusterFilter
-func (_e *MockSyncOrchestrator_Expecter) SyncServers(ctx interface{}, servers interface{}, passwords interface{}, filter interface{}) *MockSyncOrchestrator_SyncServers_Call {
-	return &MockSyncOrchestrator_SyncServers_Call{Call: _e.mock.On("SyncServers", ctx, servers, passwords, filter)}
+func (_e *MockSyncOrchestrator_Expecter) SyncServers(ctx interface{}, servers interface{}, passwords interface{}) *MockSyncOrchestrator_SyncServers_Call {
+	return &MockSyncOrchestrator_SyncServers_Call{Call: _e.mock.On("SyncServers", ctx, servers, passwords)}
 }
 
-func (_c *MockSyncOrchestrator_SyncServers_Call) Run(run func(ctx context.Context, servers []domain.ConfigServer, passwords map[string]string, filter domain.ClusterFilter)) *MockSyncOrchestrator_SyncServers_Call {
+func (_c *MockSyncOrchestrator_SyncServers_Call) Run(run func(ctx context.Context, servers []domain.ConfigServer, passwords map[string]string)) *MockSyncOrchestrator_SyncServers_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -94,26 +93,21 @@ func (_c *MockSyncOrchestrator_SyncServers_Call) Run(run func(ctx context.Contex
 		if args[2] != nil {
 			arg2 = args[2].(map[string]string)
 		}
-		var arg3 domain.ClusterFilter
-		if args[3] != nil {
-			arg3 = args[3].(domain.ClusterFilter)
-		}
 		run(
 			arg0,
 			arg1,
 			arg2,
-			arg3,
 		)
 	})
 	return _c
 }
 
-func (_c *MockSyncOrchestrator_SyncServers_Call) Return(strings []string, err error) *MockSyncOrchestrator_SyncServers_Call {
-	_c.Call.Return(strings, err)
+func (_c *MockSyncOrchestrator_SyncServers_Call) Return(syncResult *domain.SyncResult, err error) *MockSyncOrchestrator_SyncServers_Call {
+	_c.Call.Return(syncResult, err)
 	return _c
 }
 
-func (_c *MockSyncOrchestrator_SyncServers_Call) RunAndReturn(run func(ctx context.Context, servers []domain.ConfigServer, passwords map[string]string, filter domain.ClusterFilter) ([]string, error)) *MockSyncOrchestrator_SyncServers_Call {
+func (_c *MockSyncOrchestrator_SyncServers_Call) RunAndReturn(run func(ctx context.Context, servers []domain.ConfigServer, passwords map[string]string) (*domain.SyncResult, error)) *MockSyncOrchestrator_SyncServers_Call {
 	_c.Call.Return(run)
 	return _c
 }

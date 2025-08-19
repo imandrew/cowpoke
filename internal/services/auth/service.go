@@ -43,7 +43,7 @@ func (a *AuthenticatorImpl) Authenticate(
 		"password": password,
 	}
 
-	a.logger.InfoContext(ctx, "Authenticating with Rancher server",
+	a.logger.DebugContext(ctx, "Authenticating with Rancher",
 		"server", server.URL,
 		"username", server.Username,
 		"authType", server.AuthType)
@@ -77,7 +77,7 @@ func (a *AuthenticatorImpl) Authenticate(
 		return nil, errors.New("authentication succeeded but no token was returned")
 	}
 
-	a.logger.InfoContext(ctx, "Authentication successful",
+	a.logger.DebugContext(ctx, "Authentication successful",
 		"server", server.URL,
 		"userID", authResp.UserID)
 

@@ -147,7 +147,7 @@ func TestSyncCommand_Execute_SyncFails(t *testing.T) {
 
 	mockConfigRepo.On("GetServers", mock.Anything).Return(servers, nil)
 	mockPasswordReader.On("ReadPassword", mock.Anything, mock.AnythingOfType("string")).Return("password123", nil)
-	mockSyncOrchestrator.On("SyncServers", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+	mockSyncOrchestrator.On("SyncServers", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil, expectedErr)
 
 	cmd := newTestSyncCommand(mockConfigRepo, mockConfigProvider, mockPasswordReader)
@@ -180,8 +180,11 @@ func TestSyncCommand_Execute_NoKubeconfigsDownloaded(t *testing.T) {
 
 	mockConfigRepo.On("GetServers", mock.Anything).Return(servers, nil)
 	mockPasswordReader.On("ReadPassword", mock.Anything, mock.AnythingOfType("string")).Return("password123", nil)
-	mockSyncOrchestrator.On("SyncServers", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return([]string{}, nil)
+	mockSyncOrchestrator.On("SyncServers", mock.Anything, mock.Anything, mock.Anything).
+		Return(&domain.SyncResult{
+			KubeconfigPaths:    []string{},
+			TotalClustersFound: 0,
+		}, nil)
 
 	cmd := newTestSyncCommand(mockConfigRepo, mockConfigProvider, mockPasswordReader)
 	ctx := context.Background()
@@ -214,10 +217,14 @@ func TestSyncCommand_Execute_DefaultOutputPath(t *testing.T) {
 
 	mockConfigRepo.On("GetServers", mock.Anything).Return(servers, nil)
 	mockPasswordReader.On("ReadPassword", mock.Anything, mock.AnythingOfType("string")).Return("password123", nil)
-	mockSyncOrchestrator.On("SyncServers", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(kubeconfigPaths, nil)
+	mockSyncOrchestrator.On("SyncServers", mock.Anything, mock.Anything, mock.Anything).
+		Return(&domain.SyncResult{
+			KubeconfigPaths:    kubeconfigPaths,
+			TotalClustersFound: 2,
+		}, nil)
 	mockConfigProvider.On("GetDefaultKubeconfigPath").Return(defaultPath, nil)
-	mockKubeconfigHandler.On("MergeKubeconfigs", mock.Anything, kubeconfigPaths, defaultPath).Return(nil)
+	mockKubeconfigHandler.On("MergeKubeconfigs", mock.Anything, kubeconfigPaths, defaultPath, mock.AnythingOfType("*filter.NoOpFilter")).
+		Return(nil)
 
 	cmd := newTestSyncCommand(mockConfigRepo, mockConfigProvider, mockPasswordReader)
 	ctx := context.Background()
@@ -251,9 +258,13 @@ func TestSyncCommand_Execute_CustomOutputPath(t *testing.T) {
 
 	mockConfigRepo.On("GetServers", mock.Anything).Return(servers, nil)
 	mockPasswordReader.On("ReadPassword", mock.Anything, mock.AnythingOfType("string")).Return("password123", nil)
-	mockSyncOrchestrator.On("SyncServers", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(kubeconfigPaths, nil)
-	mockKubeconfigHandler.On("MergeKubeconfigs", mock.Anything, kubeconfigPaths, customPath).Return(nil)
+	mockSyncOrchestrator.On("SyncServers", mock.Anything, mock.Anything, mock.Anything).
+		Return(&domain.SyncResult{
+			KubeconfigPaths:    kubeconfigPaths,
+			TotalClustersFound: 2,
+		}, nil)
+	mockKubeconfigHandler.On("MergeKubeconfigs", mock.Anything, kubeconfigPaths, customPath, mock.AnythingOfType("*filter.NoOpFilter")).
+		Return(nil)
 
 	cmd := newTestSyncCommand(mockConfigRepo, mockConfigProvider, mockPasswordReader)
 	ctx := context.Background()
@@ -288,9 +299,13 @@ func TestSyncCommand_Execute_WithCleanupTempFiles(t *testing.T) {
 
 	mockConfigRepo.On("GetServers", mock.Anything).Return(servers, nil)
 	mockPasswordReader.On("ReadPassword", mock.Anything, mock.AnythingOfType("string")).Return("password123", nil)
-	mockSyncOrchestrator.On("SyncServers", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-		Return(kubeconfigPaths, nil)
-	mockKubeconfigHandler.On("MergeKubeconfigs", mock.Anything, kubeconfigPaths, customPath).Return(nil)
+	mockSyncOrchestrator.On("SyncServers", mock.Anything, mock.Anything, mock.Anything).
+		Return(&domain.SyncResult{
+			KubeconfigPaths:    kubeconfigPaths,
+			TotalClustersFound: 2,
+		}, nil)
+	mockKubeconfigHandler.On("MergeKubeconfigs", mock.Anything, kubeconfigPaths, customPath, mock.AnythingOfType("*filter.NoOpFilter")).
+		Return(nil)
 	mockKubeconfigHandler.On("CleanupTempFiles", mock.Anything, kubeconfigPaths).Return(nil)
 
 	cmd := newTestSyncCommand(mockConfigRepo, mockConfigProvider, mockPasswordReader)
@@ -328,16 +343,21 @@ func TestSyncCommand_Execute_WithExcludePatterns(t *testing.T) {
 	mockConfigRepo.On("GetServers", mock.Anything).Return(servers, nil)
 	mockPasswordReader.On("ReadPassword", mock.Anything, mock.AnythingOfType("string")).Return("password123", nil)
 
-	// Verify that a non-NoOp filter is passed to SyncServers
-	mockSyncOrchestrator.On("SyncServers", mock.Anything, mock.Anything, mock.Anything, mock.MatchedBy(func(filter domain.ClusterFilter) bool {
+	// Orchestrator now downloads ALL kubeconfigs without filtering
+	mockSyncOrchestrator.On("SyncServers", mock.Anything, mock.Anything, mock.Anything).
+		Return(&domain.SyncResult{
+			KubeconfigPaths:    kubeconfigPaths,
+			TotalClustersFound: 3,
+		}, nil)
+
+	mockConfigProvider.On("GetDefaultKubeconfigPath").Return("/home/user/.kube/config", nil)
+	// Filter is now passed to MergeKubeconfigs instead
+	mockKubeconfigHandler.On("MergeKubeconfigs", mock.Anything, kubeconfigPaths, "/home/user/.kube/config", mock.MatchedBy(func(filter domain.ClusterFilter) bool {
 		// Test that it's an actual exclude filter, not NoOp
 		return filter.ShouldExclude("test-cluster") && filter.ShouldExclude("prod-staging") &&
 			!filter.ShouldExclude("production")
 	})).
-		Return(kubeconfigPaths, nil)
-
-	mockConfigProvider.On("GetDefaultKubeconfigPath").Return("/home/user/.kube/config", nil)
-	mockKubeconfigHandler.On("MergeKubeconfigs", mock.Anything, kubeconfigPaths, "/home/user/.kube/config").Return(nil)
+		Return(nil)
 
 	cmd := newTestSyncCommand(mockConfigRepo, mockConfigProvider, mockPasswordReader)
 	ctx := context.Background()

@@ -29,3 +29,12 @@ type PasswordReader interface {
 type ClusterFilter interface {
 	ShouldExclude(clusterName string) bool
 }
+
+// SyncResult contains the results of a sync operation.
+type SyncResult struct {
+	// KubeconfigPaths contains paths to downloaded kubeconfig files.
+	KubeconfigPaths []string
+	// TotalClustersFound is the total number of clusters found from Rancher APIs.
+	// Filtering is now applied at the kubeconfig merge level, not during sync.
+	TotalClustersFound int
+}

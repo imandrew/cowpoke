@@ -70,22 +70,26 @@ func (c *SyncCommand) Execute(
 	// Create cluster filter based on exclude patterns
 	var clusterFilter domain.ClusterFilter
 	if len(req.ExcludePatterns) > 0 {
+		c.logger.DebugContext(ctx, "Creating exclude filter",
+			"patterns", req.ExcludePatterns)
 		excludeFilter, filterErr := filter.NewExcludeFilter(req.ExcludePatterns, c.logger)
 		if filterErr != nil {
 			return fmt.Errorf("failed to create exclude filter: %w", filterErr)
 		}
 		clusterFilter = excludeFilter
+		c.logger.DebugContext(ctx, "Created exclude filter")
 	} else {
+		c.logger.DebugContext(ctx, "No exclude patterns, using no-op filter")
 		clusterFilter = filter.NewNoOpFilter()
 	}
 
-	// Use SyncOrchestrator for concurrent processing
-	allKubeconfigPaths, err := syncOrchestrator.SyncServers(ctx, servers, passwords, clusterFilter)
+	// Use SyncOrchestrator for concurrent processing (no filtering at this level)
+	syncResult, err := syncOrchestrator.SyncServers(ctx, servers, passwords)
 	if err != nil {
 		return fmt.Errorf("concurrent sync failed: %w", err)
 	}
 
-	if len(allKubeconfigPaths) == 0 {
+	if len(syncResult.KubeconfigPaths) == 0 {
 		return errors.New("no kubeconfigs downloaded successfully")
 	}
 
@@ -98,25 +102,22 @@ func (c *SyncCommand) Execute(
 		}
 	}
 
-	// Merge all kubeconfigs
-	c.logger.InfoContext(ctx, "Merging kubeconfigs",
-		"count", len(allKubeconfigPaths),
+	c.logger.DebugContext(ctx, "Merging kubeconfigs",
+		"count", len(syncResult.KubeconfigPaths),
 		"output", outputPath)
 
-	if mergeErr := kubeconfigHandler.MergeKubeconfigs(ctx, allKubeconfigPaths, outputPath); mergeErr != nil {
+	if mergeErr := kubeconfigHandler.MergeKubeconfigs(ctx, syncResult.KubeconfigPaths, outputPath, clusterFilter); mergeErr != nil {
 		return fmt.Errorf("failed to merge kubeconfigs: %w", mergeErr)
 	}
 
 	// Cleanup temporary files if requested
 	if req.CleanupTempFiles {
-		if cleanupErr := kubeconfigHandler.CleanupTempFiles(ctx, allKubeconfigPaths); cleanupErr != nil {
+		if cleanupErr := kubeconfigHandler.CleanupTempFiles(ctx, syncResult.KubeconfigPaths); cleanupErr != nil {
 			c.logger.WarnContext(ctx, "Failed to cleanup some temporary files", "error", cleanupErr)
 		}
 	}
 
-	c.logger.InfoContext(ctx, "Concurrent sync completed successfully",
-		"servers", len(servers),
-		"kubeconfigs", len(allKubeconfigPaths),
+	c.logger.InfoContext(ctx, "Sync completed",
 		"output", outputPath)
 
 	return nil
@@ -126,7 +127,7 @@ func (c *SyncCommand) Execute(
 func (c *SyncCommand) collectPasswords(ctx context.Context, servers []domain.ConfigServer) (map[string]string, error) {
 	passwords := make(map[string]string)
 
-	c.logger.InfoContext(ctx, "Collecting passwords for all servers")
+	c.logger.DebugContext(ctx, "Collecting passwords for servers", "count", len(servers))
 
 	for _, server := range servers {
 		password, err := c.passwordReader.ReadPassword(ctx,

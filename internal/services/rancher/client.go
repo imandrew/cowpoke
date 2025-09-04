@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"cowpoke/internal/domain"
@@ -17,6 +18,11 @@ import (
 type Client struct {
 	httpAdapter domain.HTTPAdapter
 	logger      *slog.Logger
+}
+
+// normalizeURL removes trailing slashes from a URL to ensure consistent API endpoint construction.
+func normalizeURL(url string) string {
+	return strings.TrimSuffix(url, "/")
 }
 
 // NewClient creates a new Rancher client.
@@ -34,7 +40,7 @@ func (c *Client) Authenticate(
 	password string,
 ) (domain.AuthToken, error) {
 	authURL := fmt.Sprintf("%s/v3-public/%sProviders/%s?action=login",
-		server.URL, server.AuthType, server.AuthType)
+		normalizeURL(server.URL), server.AuthType, server.AuthType)
 
 	payload := map[string]string{
 		"username": server.Username,
@@ -51,48 +57,42 @@ func (c *Client) Authenticate(
 	}
 	defer resp.Body.Close()
 
-	// Check response status - Rancher login returns 201 (Created) for new tokens.
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf(
-			"authentication failed with status %d: %s",
-			resp.StatusCode,
-			string(body),
-		)
-	}
-	var authResp authResponse
-	err = json.NewDecoder(resp.Body).Decode(&authResp)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode auth response: %w", err)
+		return nil, fmt.Errorf("failed to read auth response body: %w", err)
 	}
 
-	// Validate the response
+	var authResp authResponse
+	err = json.Unmarshal(bodyBytes, &authResp)
+	if err != nil {
+		return nil, fmt.Errorf("authentication failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
 	if authResp.Token == "" {
-		return nil, errors.New("authentication succeeded but no token was returned")
+		if len(bodyBytes) > 0 {
+			return nil, fmt.Errorf("authentication failed with status %d: %s", resp.StatusCode, string(bodyBytes))
+		}
+		return nil, fmt.Errorf("authentication failed: no token in response (status %d)", resp.StatusCode)
 	}
 
 	c.logger.InfoContext(ctx, "Authentication successful",
 		"server", server.URL,
 		"userID", authResp.UserID)
 
-	// Calculate expiry time from response
 	var expiresAt time.Time
 	if authResp.ExpiresAt != "" {
-		// Parse ISO 8601 timestamp
 		if parsedTime, parseErr := time.Parse(time.RFC3339, authResp.ExpiresAt); parseErr == nil {
 			expiresAt = parsedTime
 		}
 	}
 	if expiresAt.IsZero() && authResp.TTL > 0 {
-		// Fallback to TTL in milliseconds
 		expiresAt = time.Now().Add(time.Duration(authResp.TTL) * time.Millisecond)
 	}
 	if expiresAt.IsZero() {
-		// Final fallback to default 16 hours (Rancher's typical default)
+		// Final fallback to default 16 hours (Rancher's typical default).
 		expiresAt = time.Now().Add(16 * time.Hour) //nolint:mnd // Rancher default session TTL
 	}
 
-	// Create and return the auth token
 	return &token{
 		value:     authResp.Token,
 		expiresAt: expiresAt,
@@ -105,7 +105,7 @@ func (c *Client) ListClusters(
 	token domain.AuthToken,
 	server domain.ConfigServer,
 ) ([]domain.Cluster, error) {
-	clustersURL := fmt.Sprintf("%s/v3/clusters", server.URL)
+	clustersURL := fmt.Sprintf("%s/v3/clusters", normalizeURL(server.URL))
 
 	c.logger.InfoContext(ctx, "Fetching clusters from Rancher server", "server", server.URL)
 
@@ -131,7 +131,6 @@ func (c *Client) ListClusters(
 
 	clusters := make([]domain.Cluster, 0, len(clustersResp.Data))
 	for _, cluster := range clustersResp.Data {
-		// Skip clusters that are not active or don't have a valid ID
 		if cluster.ID == "" || cluster.Name == "" {
 			c.logger.WarnContext(ctx, "Skipping invalid cluster", "id", cluster.ID, "name", cluster.Name)
 			continue
@@ -160,7 +159,7 @@ func (c *Client) GetKubeconfig(
 ) ([]byte, error) {
 	kubeconfigURL := fmt.Sprintf(
 		"%s/v3/clusters/%s?action=generateKubeconfig",
-		server.URL,
+		normalizeURL(server.URL),
 		clusterID,
 	)
 
@@ -174,7 +173,6 @@ func (c *Client) GetKubeconfig(
 	}
 	defer resp.Body.Close()
 
-	// Rancher kubeconfig generation returns 201 (Created) for new kubeconfigs
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf(
@@ -205,8 +203,8 @@ type authResponse struct {
 	Token     string `json:"token"`
 	Type      string `json:"type"`
 	UserID    string `json:"userId"`
-	TTL       int64  `json:"ttl"`       // TTL in milliseconds
-	ExpiresAt string `json:"expiresAt"` // ISO 8601 timestamp
+	TTL       int64  `json:"ttl"`       // TTL in milliseconds.
+	ExpiresAt string `json:"expiresAt"` // ISO 8601 timestamp.
 	Expired   bool   `json:"expired"`
 }
 

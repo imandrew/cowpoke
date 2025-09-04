@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"cowpoke/internal/domain"
@@ -164,6 +165,42 @@ func TestAddServer_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, repo.config.Servers, 1)
 	assert.Equal(t, newServer.URL, repo.config.Servers[0].URL)
+	mockFS.AssertExpectations(t)
+}
+
+func TestAddServer_NormalizesTrailingSlash(t *testing.T) {
+	// Arrange
+	mockFS := mocks.NewMockFileSystemAdapter(t)
+	logger := testutil.Logger()
+	repo := &Repository{
+		fs:         mockFS,
+		configPath: "/test/config.yaml",
+		logger:     logger,
+		migrator:   migrations.NewMigrator(logger),
+		config:     &Config{Version: "2.0", Servers: []domain.ConfigServer{}},
+	}
+
+	serverWithSlash := domain.ConfigServer{
+		URL:      "https://rancher.example.com/",
+		Username: "admin",
+		AuthType: "local",
+	}
+
+	// Expect the server to be saved without trailing slash
+	mockFS.On("WriteFile", "/test/config.yaml", mock.MatchedBy(func(data []byte) bool {
+		return strings.Contains(string(data), "https://rancher.example.com") &&
+			!strings.Contains(string(data), "https://rancher.example.com/")
+	}), os.FileMode(0o600)).Return(nil)
+
+	ctx := context.Background()
+
+	// Act
+	err := repo.AddServer(ctx, serverWithSlash)
+
+	// Assert
+	require.NoError(t, err)
+	assert.Len(t, repo.config.Servers, 1)
+	assert.Equal(t, "https://rancher.example.com", repo.config.Servers[0].URL)
 	mockFS.AssertExpectations(t)
 }
 

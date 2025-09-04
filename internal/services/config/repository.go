@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -72,6 +73,9 @@ func (r *Repository) GetServers(ctx context.Context) ([]domain.ConfigServer, err
 
 // AddServer adds a new server to the configuration.
 func (r *Repository) AddServer(ctx context.Context, server domain.ConfigServer) error {
+	// Normalize URL by removing trailing slashes to prevent API endpoint issues.
+	server.URL = strings.TrimSuffix(server.URL, "/")
+
 	for _, existing := range r.config.Servers {
 		if existing.URL == server.URL {
 			return fmt.Errorf("server %s already exists in configuration", server.URL)
